@@ -1,0 +1,50 @@
+<%- include('partials_header', { title: 'Products', company }) %>
+
+<section class="card">
+  <h1>Products (Preset)</h1>
+  <form method="POST" action="<%= basePath %>/products" class="product-form">
+    <input type="text" name="name" placeholder="Product name" required />
+    <input type="text" name="description" placeholder="Description" />
+    <input type="text" name="hsn" placeholder="HSN" />
+    <input type="text" name="unit" placeholder="Unit (e.g. nos)" />
+    <input type="number" step="0.01" name="price" placeholder="Price" />
+    <input type="number" step="0.01" name="gst_rate" placeholder="GST %" />
+    <button type="submit" class="btn-primary">Add Product</button>
+  </form>
+
+  <div class="table-wrap">
+    <table>
+      <thead>
+        <tr>
+          <th>Name</th>
+          <th>Description</th>
+          <th>HSN</th>
+          <th>Unit</th>
+          <th>Price</th>
+          <th>GST %</th>
+          <th>Actions</th>
+        </tr>
+      </thead>
+      <tbody>
+        <% products.forEach(product => { %>
+          <tr>
+            <td><%= product.name %></td>
+            <td><%= product.description || '-' %></td>
+            <td><%= product.hsn || '-' %></td>
+            <td><%= product.unit || '-' %></td>
+            <td><%= Number(product.price).toFixed(2) %></td>
+            <td><%= Number(product.gst_rate).toFixed(2) %></td>
+            <td class="row-actions">
+              <a class="btn-secondary" href="<%= basePath %>/products/<%= product.id %>/edit">Edit</a>
+              <form method="POST" action="<%= basePath %>/products/<%= product.id %>/delete" onsubmit="return confirm('Delete this product?')">
+                <button class="btn-danger" type="submit">Delete</button>
+              </form>
+            </td>
+          </tr>
+        <% }) %>
+      </tbody>
+    </table>
+  </div>
+</section>
+
+<%- include('partials_footer') %>

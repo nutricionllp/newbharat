@@ -1,0 +1,38 @@
+<%- include('partials_header', { title: 'Edit Product', company }) %>
+
+<section class="card">
+  <h1>Edit Product</h1>
+  <form method="POST" action="<%= basePath %>/products/<%= product.id %>" class="product-edit-form">
+    <label>
+      Product Name
+      <input type="text" name="name" value="<%= product.name %>" required />
+    </label>
+    <label>
+      Description
+      <input type="text" name="description" value="<%= product.description || '' %>" />
+    </label>
+    <label>
+      HSN
+      <input type="text" name="hsn" value="<%= product.hsn || '' %>" />
+    </label>
+    <label>
+      Unit
+      <input type="text" name="unit" value="<%= product.unit || '' %>" />
+    </label>
+    <label>
+      Price
+      <input type="number" step="0.01" name="price" value="<%= Number(product.price).toFixed(2) %>" />
+    </label>
+    <label>
+      GST %
+      <input type="number" step="0.01" name="gst_rate" value="<%= Number(product.gst_rate).toFixed(2) %>" />
+    </label>
+
+    <div class="row-actions">
+      <button type="submit" class="btn-primary">Save Product</button>
+      <a href="<%= basePath %>/products" class="btn-secondary">Back</a>
+    </div>
+  </form>
+</section>
+
+<%- include('partials_footer') %>

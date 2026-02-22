@@ -1,0 +1,19 @@
+{
+  "name": "New Bharat Enterprise",
+  "tagline": "Solar Solutions",
+  "address": "First Floor, Narmada Plaza, above Gokul dairy, Kadi, Gujarat 384440",
+  "phone": "+91-99788 62711",
+  "email": "Newbharat.gujarat@gmail.com",
+  "gstin": "24AAYFN8774C1ZO",
+  "bank": {
+    "accountName": "New Bharat Enterprise",
+    "accountNo": "XXXXXXXXXXXX",
+    "ifsc": "XXXXXXXXXXX",
+    "bankName": "Your Bank"
+  },
+  "terms": [
+    "Prices are inclusive of applicable GST.",
+    "Quotation validity: 7 days from the quote date.",
+    "Warranty as per manufacturer terms."
+  ]
+}

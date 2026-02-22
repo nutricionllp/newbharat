@@ -1,0 +1,79 @@
+<%- include('partials_header', { title: pageTitle || 'New Quote', company }) %>
+
+<section class="card">
+  <h1><%= pageTitle || 'New Quotation' %></h1>
+  <form id="quote-form" method="POST" action="<%= basePath %><%= formAction || '/quotes' %>">
+    <div class="grid">
+      <label>
+        Quote Date
+        <input type="date" name="quote_date" value="<%= quote?.quote_date_display || '' %>" required />
+      </label>
+      <label>
+        Customer Name
+        <input type="text" name="customer_name" value="<%= quote?.customer_name || '' %>" required placeholder="Customer name" />
+      </label>
+      <label>
+        Phone
+        <input type="text" name="customer_phone" value="<%= quote?.customer_phone || '' %>" placeholder="Phone number" />
+      </label>
+      <label>
+        Email
+        <input type="email" name="customer_email" value="<%= quote?.customer_email || '' %>" placeholder="Email" />
+      </label>
+      <label class="span-2">
+        Address
+        <textarea name="customer_address" rows="2" placeholder="Customer address"><%= quote?.customer_address || '' %></textarea>
+      </label>
+      <label>
+        GSTIN
+        <input type="text" name="customer_gstin" value="<%= quote?.customer_gstin || '' %>" placeholder="Customer GSTIN" />
+      </label>
+    </div>
+
+    <h2>Items</h2>
+    <div class="table-wrap">
+      <table id="items-table">
+        <thead>
+          <tr>
+            <th>Product</th>
+            <th>Item / Description</th>
+            <th>HSN</th>
+            <th>Unit</th>
+            <th>Qty</th>
+            <th>Rate</th>
+            <th>GST %</th>
+            <th>Taxable</th>
+            <th>CGST</th>
+            <th>SGST</th>
+            <th>Total</th>
+            <th></th>
+          </tr>
+        </thead>
+        <tbody></tbody>
+      </table>
+    </div>
+    <button type="button" id="add-item" class="btn-secondary">+ Add Item</button>
+
+    <div class="summary">
+      <div>Subtotal: <span id="subtotal">0.00</span></div>
+      <div>CGST: <span id="cgst-total">0.00</span></div>
+      <div>SGST: <span id="sgst-total">0.00</span></div>
+      <div class="grand">Grand Total: <span id="grand-total">0.00</span></div>
+    </div>
+
+    <label class="notes">
+      Notes / Terms (Optional)
+      <textarea name="notes" rows="2" placeholder="Any extra notes or terms"><%= quote?.notes || '' %></textarea>
+    </label>
+
+    <input type="hidden" name="items_json" id="items-json" />
+    <button type="submit" class="btn-primary"><%= submitLabel || 'Save & Download PDF' %></button>
+  </form>
+</section>
+
+<script>
+  window.PRESET_PRODUCTS = <%- JSON.stringify(products || []) %>;
+  window.INITIAL_QUOTE_ITEMS = <%- JSON.stringify(initialItems || []) %>;
+</script>
+
+<%- include('partials_footer') %>
