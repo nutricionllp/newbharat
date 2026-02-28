@@ -159,7 +159,7 @@
     }
 
     proposalBody.innerHTML = '';
-    rows.forEach((item) => {
+    rows.forEach((item, idx) => {
       const tr = document.createElement('tr');
       const srNoTd = document.createElement('td');
       srNoTd.textContent = item.sr_no || '';
@@ -175,6 +175,7 @@
       qtyInput.type = 'text';
       qtyInput.className = 'proposal-qty';
       qtyInput.value = item.qty || '';
+      qtyInput.name = `proposal_qty_${idx}`;
       qtyTd.appendChild(qtyInput);
 
       const specificationTd = document.createElement('td');
@@ -182,6 +183,7 @@
       specificationInput.type = 'text';
       specificationInput.className = 'proposal-specification';
       specificationInput.value = item.specification || '';
+      specificationInput.name = `proposal_specification_${idx}`;
       specificationTd.appendChild(specificationInput);
 
       const makeTd = document.createElement('td');
@@ -189,6 +191,7 @@
       makeInput.type = 'text';
       makeInput.className = 'proposal-make';
       makeInput.value = item.make || '';
+      makeInput.name = `proposal_make_${idx}`;
       makeTd.appendChild(makeInput);
 
       tr.appendChild(srNoTd);

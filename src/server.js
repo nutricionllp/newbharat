@@ -20,7 +20,7 @@ function withBase(pathname) {
 
 app.use((req, res, next) => {
   res.locals.basePath = normalizedBasePath;
-  res.locals.assetVersion = '20260228-1';
+  res.locals.assetVersion = '20260228-2';
 
   if (!normalizedBasePath) {
     return next();
@@ -90,7 +90,7 @@ function getDefaultProposalItems() {
   return proposalTemplate.map(normalizeProposalTemplateRow);
 }
 
-function parseProposalItems(proposalItemsJson) {
+function parseProposalItems(proposalItemsJson, formBody = null) {
   const defaults = getDefaultProposalItems();
   if (!defaults.length) {
     return [];
@@ -109,11 +109,20 @@ function parseProposalItems(proposalItemsJson) {
 
   return defaults.map((baseRow, idx) => {
     const row = parsed[idx] || {};
-    const qtyValue = Object.prototype.hasOwnProperty.call(row, 'qty') ? text(row.qty) : baseRow.qty;
-    const specificationValue = Object.prototype.hasOwnProperty.call(row, 'specification')
-      ? text(row.specification)
-      : baseRow.specification;
-    const makeValue = Object.prototype.hasOwnProperty.call(row, 'make') ? text(row.make) : baseRow.make;
+    const hasFormBody = formBody && typeof formBody === 'object';
+    const formQty = hasFormBody ? formBody[`proposal_qty_${idx}`] : undefined;
+    const formSpecification = hasFormBody ? formBody[`proposal_specification_${idx}`] : undefined;
+    const formMake = hasFormBody ? formBody[`proposal_make_${idx}`] : undefined;
+
+    const qtyValue = formQty !== undefined
+      ? text(formQty)
+      : (Object.prototype.hasOwnProperty.call(row, 'qty') ? text(row.qty) : baseRow.qty);
+    const specificationValue = formSpecification !== undefined
+      ? text(formSpecification)
+      : (Object.prototype.hasOwnProperty.call(row, 'specification') ? text(row.specification) : baseRow.specification);
+    const makeValue = formMake !== undefined
+      ? text(formMake)
+      : (Object.prototype.hasOwnProperty.call(row, 'make') ? text(row.make) : baseRow.make);
     return {
       sr_no: baseRow.sr_no,
       description: baseRow.description,
@@ -202,7 +211,7 @@ async function ensureQuoteEnhancements() {
 
 async function saveQuote({ body, quoteId }) {
   const items = parseItems(body.items_json || '[]');
-  const proposalItems = parseProposalItems(body.proposal_items_json || '[]');
+  const proposalItems = parseProposalItems(body.proposal_items_json || '[]', body);
   const proposalItemsJson = JSON.stringify(proposalItems);
   const { subtotal, cgstTotal, sgstTotal, total } = buildQuoteSummary(items);
 
