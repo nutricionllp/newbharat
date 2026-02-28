@@ -20,7 +20,7 @@ function withBase(pathname) {
 
 app.use((req, res, next) => {
   res.locals.basePath = normalizedBasePath;
-  res.locals.assetVersion = '20260228-3';
+  res.locals.assetVersion = '20260228-4';
 
   if (!normalizedBasePath) {
     return next();
@@ -40,7 +40,84 @@ const company = JSON.parse(
   fs.readFileSync(path.join(__dirname, 'config', 'company.json'), 'utf8')
 );
 
-const proposalTemplate = Array.isArray(company.proposalTemplate) ? company.proposalTemplate : [];
+const fallbackProposalTemplate = [
+  {
+    sr_no: 1,
+    description: 'Solar PV Modules - (Module Size having +-05 Wp variation)',
+    unit: 'Nos',
+    specification: '620',
+    qty: '5',
+    make: 'ADANI'
+  },
+  {
+    sr_no: 2,
+    description: 'Module mounting structure',
+    unit: 'Set',
+    specification: 'As per design',
+    qty: 'As per design',
+    make: 'Hot Dip Galv. Iron 60x40 & 40x40'
+  },
+  {
+    sr_no: 3,
+    description: 'String type Grid Tied Inverter as per availability',
+    unit: 'Nos',
+    specification: 'As per design',
+    qty: '1',
+    make: 'SOLARYAAN / XWATT'
+  },
+  {
+    sr_no: 4,
+    description: 'DCDB with accessories',
+    unit: 'Nos',
+    specification: 'As per design',
+    qty: 'As per design',
+    make: 'L&T/HAVELLS'
+  },
+  {
+    sr_no: 5,
+    description: 'ACDB with accessories',
+    unit: 'Nos',
+    specification: 'As per design',
+    qty: 'At actual',
+    make: 'L&T/HAVELLS'
+  },
+  {
+    sr_no: 6,
+    description: 'DC Wire with UV protected - TUV Certified',
+    unit: 'Mtr.',
+    specification: 'As per design',
+    qty: 'At actual',
+    make: 'POLYCAB'
+  },
+  {
+    sr_no: 7,
+    description: 'AC Wire - TUV Certified',
+    unit: 'Mtr.',
+    specification: 'As per design',
+    qty: 'At actual',
+    make: 'POLYCAB'
+  },
+  {
+    sr_no: 8,
+    description: 'Advanced Chemical Earthing systems',
+    unit: 'Nos',
+    specification: 'As per design',
+    qty: 'As per design',
+    make: 'Standard'
+  },
+  {
+    sr_no: 9,
+    description: 'Lightening arrester',
+    unit: 'Nos',
+    specification: 'As per design',
+    qty: 'As per design',
+    make: 'Standard'
+  }
+];
+
+const proposalTemplate = Array.isArray(company.proposalTemplate) && company.proposalTemplate.length
+  ? company.proposalTemplate
+  : fallbackProposalTemplate;
 const estimatedOtherCharges = Array.isArray(company.estimatedOtherCharges) ? company.estimatedOtherCharges : [];
 const customerScopeRows = Array.isArray(company.customerScope) ? company.customerScope : [];
 const termsConditions = Array.isArray(company.termsConditions) ? company.termsConditions : [];

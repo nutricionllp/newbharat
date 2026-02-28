@@ -75,7 +75,10 @@
           </tr>
         </thead>
         <tbody>
-          <% (initialProposalItems || []).forEach((item, idx) => { %>
+          <% const proposalRows = (initialProposalItems && initialProposalItems.length)
+            ? initialProposalItems
+            : ((company && Array.isArray(company.proposalTemplate)) ? company.proposalTemplate : []); %>
+          <% proposalRows.forEach((item, idx) => { %>
             <tr
               data-sr-no="<%= item.sr_no || '' %>"
               data-description="<%= item.description || '' %>"
