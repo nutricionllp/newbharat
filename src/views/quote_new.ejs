@@ -74,7 +74,28 @@
             <th>Make</th>
           </tr>
         </thead>
-        <tbody></tbody>
+        <tbody>
+          <% (initialProposalItems || []).forEach((item, idx) => { %>
+            <tr
+              data-sr-no="<%= item.sr_no || '' %>"
+              data-description="<%= item.description || '' %>"
+              data-unit="<%= item.unit || '' %>"
+            >
+              <td><%= item.sr_no || '' %></td>
+              <td><%= item.description || '' %></td>
+              <td><%= item.unit || '' %></td>
+              <td>
+                <input type="text" class="proposal-qty" name="proposal_qty_<%= idx %>" value="<%= item.qty || '' %>" />
+              </td>
+              <td>
+                <input type="text" class="proposal-specification" name="proposal_specification_<%= idx %>" value="<%= item.specification || '' %>" />
+              </td>
+              <td>
+                <input type="text" class="proposal-make" name="proposal_make_<%= idx %>" value="<%= item.make || '' %>" />
+              </td>
+            </tr>
+          <% }) %>
+        </tbody>
       </table>
     </div>
 

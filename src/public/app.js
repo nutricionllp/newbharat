@@ -153,62 +153,6 @@
     tableBody.appendChild(row);
   }
 
-  function renderProposalRows(rows) {
-    if (!proposalBody) {
-      return;
-    }
-
-    proposalBody.innerHTML = '';
-    rows.forEach((item, idx) => {
-      const tr = document.createElement('tr');
-      const srNoTd = document.createElement('td');
-      srNoTd.textContent = item.sr_no || '';
-
-      const descriptionTd = document.createElement('td');
-      descriptionTd.textContent = item.description || '';
-
-      const unitTd = document.createElement('td');
-      unitTd.textContent = item.unit || '';
-
-      const qtyTd = document.createElement('td');
-      const qtyInput = document.createElement('input');
-      qtyInput.type = 'text';
-      qtyInput.className = 'proposal-qty';
-      qtyInput.value = item.qty || '';
-      qtyInput.name = `proposal_qty_${idx}`;
-      qtyTd.appendChild(qtyInput);
-
-      const specificationTd = document.createElement('td');
-      const specificationInput = document.createElement('input');
-      specificationInput.type = 'text';
-      specificationInput.className = 'proposal-specification';
-      specificationInput.value = item.specification || '';
-      specificationInput.name = `proposal_specification_${idx}`;
-      specificationTd.appendChild(specificationInput);
-
-      const makeTd = document.createElement('td');
-      const makeInput = document.createElement('input');
-      makeInput.type = 'text';
-      makeInput.className = 'proposal-make';
-      makeInput.value = item.make || '';
-      makeInput.name = `proposal_make_${idx}`;
-      makeTd.appendChild(makeInput);
-
-      tr.appendChild(srNoTd);
-      tr.appendChild(descriptionTd);
-      tr.appendChild(unitTd);
-      tr.appendChild(qtyTd);
-      tr.appendChild(specificationTd);
-      tr.appendChild(makeTd);
-
-      tr.dataset.srNo = item.sr_no || '';
-      tr.dataset.description = item.description || '';
-      tr.dataset.unit = item.unit || '';
-
-      proposalBody.appendChild(tr);
-    });
-  }
-
   function collectProposalItems() {
     if (!proposalBody) {
       return [];
@@ -271,7 +215,5 @@
     addRow();
   }
 
-  if (initialProposalItems.length) {
-    renderProposalRows(initialProposalItems);
-  }
+  // Proposal rows are server-rendered to avoid browser-cache JS mismatches.
 })();
