@@ -20,6 +20,7 @@ function withBase(pathname) {
 
 app.use((req, res, next) => {
   res.locals.basePath = normalizedBasePath;
+  res.locals.assetVersion = '20260228-1';
 
   if (!normalizedBasePath) {
     return next();
