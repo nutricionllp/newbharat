@@ -178,7 +178,11 @@
       qtyTd.appendChild(qtyInput);
 
       const specificationTd = document.createElement('td');
-      specificationTd.textContent = item.specification || '';
+      const specificationInput = document.createElement('input');
+      specificationInput.type = 'text';
+      specificationInput.className = 'proposal-specification';
+      specificationInput.value = item.specification || '';
+      specificationTd.appendChild(specificationInput);
 
       const makeTd = document.createElement('td');
       const makeInput = document.createElement('input');
@@ -197,7 +201,6 @@
       tr.dataset.srNo = item.sr_no || '';
       tr.dataset.description = item.description || '';
       tr.dataset.unit = item.unit || '';
-      tr.dataset.specification = item.specification || '';
 
       proposalBody.appendChild(tr);
     });
@@ -214,7 +217,7 @@
         sr_no: tr.dataset.srNo || '',
         description: tr.dataset.description || '',
         unit: tr.dataset.unit || '',
-        specification: tr.dataset.specification || '',
+        specification: tr.querySelector('.proposal-specification')?.value?.trim() || '',
         qty: tr.querySelector('.proposal-qty')?.value?.trim() || '',
         make: tr.querySelector('.proposal-make')?.value?.trim() || ''
       });

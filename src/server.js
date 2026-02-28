@@ -109,12 +109,15 @@ function parseProposalItems(proposalItemsJson) {
   return defaults.map((baseRow, idx) => {
     const row = parsed[idx] || {};
     const qtyValue = Object.prototype.hasOwnProperty.call(row, 'qty') ? text(row.qty) : baseRow.qty;
+    const specificationValue = Object.prototype.hasOwnProperty.call(row, 'specification')
+      ? text(row.specification)
+      : baseRow.specification;
     const makeValue = Object.prototype.hasOwnProperty.call(row, 'make') ? text(row.make) : baseRow.make;
     return {
       sr_no: baseRow.sr_no,
       description: baseRow.description,
       unit: baseRow.unit,
-      specification: baseRow.specification,
+      specification: specificationValue,
       qty: qtyValue,
       make: makeValue
     };
@@ -346,7 +349,8 @@ function drawTable(doc, {
   rows,
   startY,
   x = 40,
-  drawTitleOnNewPage = true
+  drawTitleOnNewPage = true,
+  keepTogether = false
 }) {
   const totalWidth = columns.reduce((sum, col) => sum + col.width, 0);
   const pageBottom = doc.page.height - doc.page.margins.bottom;
@@ -354,6 +358,31 @@ function drawTable(doc, {
   const headerHeight = 24;
 
   let y = startY;
+
+  if (keepTogether) {
+    let estimatedHeight = title ? titleHeight : 0;
+    estimatedHeight += headerHeight;
+    rows.forEach((row) => {
+      const rowValues = columns.map((col) => text(row[col.key] || ''));
+      const rowHeight = Math.max(
+        24,
+        ...rowValues.map((value, idx) => {
+          const col = columns[idx];
+          const cellHeight = doc.heightOfString(value, {
+            width: col.width - 8,
+            align: col.align || 'left'
+          });
+          return cellHeight + 8;
+        })
+      );
+      estimatedHeight += rowHeight;
+    });
+
+    if (y + estimatedHeight > pageBottom) {
+      doc.addPage();
+      y = doc.page.margins.top;
+    }
+  }
 
   function drawTitleRow(textValue) {
     doc.save();
@@ -739,7 +768,8 @@ app.get('/quotes/:id/pdf', asyncHandler(async (req, res) => {
       { key: 'parameter', label: 'Parameters', width: 240 },
       { key: 'remark', label: 'Remarks', width: 230, align: 'center' }
     ],
-    rows: warrantyRows
+    rows: warrantyRows,
+    keepTogether: true
   }) + 10;
 
   if (quote.notes) {
