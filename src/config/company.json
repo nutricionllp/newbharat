@@ -11,9 +11,189 @@
     "ifsc": "XXXXXXXXXXX",
     "bankName": "Your Bank"
   },
-  "terms": [
-    "Prices are inclusive of applicable GST.",
-    "Quotation validity: 7 days from the quote date.",
-    "Warranty as per manufacturer terms."
+  "proposalTemplate": [
+    {
+      "sr_no": 1,
+      "description": "Solar PV Modules - (Module Size having +-05 Wp variation)",
+      "unit": "Nos",
+      "specification": "620",
+      "qty": "5",
+      "make": "ADANI"
+    },
+    {
+      "sr_no": 2,
+      "description": "Module mounting structure",
+      "unit": "Set",
+      "specification": "As per design",
+      "qty": "As per design",
+      "make": "Hot Dip Galv. Iron 60x40 & 40x40"
+    },
+    {
+      "sr_no": 3,
+      "description": "String type Grid Tied Inverter as per availability",
+      "unit": "Nos",
+      "specification": "As per design",
+      "qty": "1",
+      "make": "SOLARYAAN / XWATT"
+    },
+    {
+      "sr_no": 4,
+      "description": "DCDB with accessories",
+      "unit": "Nos",
+      "specification": "As per design",
+      "qty": "As per design",
+      "make": "L&T/HAVELLS"
+    },
+    {
+      "sr_no": 5,
+      "description": "ACDB with accessories",
+      "unit": "Nos",
+      "specification": "As per design",
+      "qty": "At actual",
+      "make": "L&T/HAVELLS"
+    },
+    {
+      "sr_no": 6,
+      "description": "DC Wire with UV protected - TUV Certified",
+      "unit": "Mtr.",
+      "specification": "As per design",
+      "qty": "At actual",
+      "make": "POLYCAB"
+    },
+    {
+      "sr_no": 7,
+      "description": "AC Wire - TUV Certified",
+      "unit": "Mtr.",
+      "specification": "As per design",
+      "qty": "At actual",
+      "make": "POLYCAB"
+    },
+    {
+      "sr_no": 8,
+      "description": "Advanced Chemical Earthing systems",
+      "unit": "Nos",
+      "specification": "As per design",
+      "qty": "As per design",
+      "make": "Standard"
+    },
+    {
+      "sr_no": 9,
+      "description": "Lightening arrester",
+      "unit": "Nos",
+      "specification": "As per design",
+      "qty": "As per design",
+      "make": "Standard"
+    }
+  ],
+  "estimatedOtherCharges": [
+    {
+      "item": "DISCOM Solar Conectivity Charges",
+      "remark": "Excluded"
+    },
+    {
+      "item": "Franking + MCB",
+      "remark": "Excluded"
+    },
+    {
+      "item": "Highted Primium Structure",
+      "remark": "Excluded"
+    }
+  ],
+  "customerScope": [
+    {
+      "sr_no": "3",
+      "description": "Roof top area @10 Sq.Mtr./KWp to be provided with shadow free area + Space for earthing on ground",
+      "remark": "Customer Scope"
+    },
+    {
+      "sr_no": "4",
+      "description": "Civil works",
+      "remark": "Included"
+    },
+    {
+      "sr_no": "5",
+      "description": "Hot Dip Galv. Iron Box pipe Structure (60x40 & 40x40)",
+      "remark": "Included up to 6 feet"
+    },
+    {
+      "sr_no": "6",
+      "description": "Mounting,Erection and Commissioning",
+      "remark": "Included"
+    },
+    {
+      "sr_no": "7",
+      "description": "Power evacuations (solar plant to mains)",
+      "remark": "Included"
+    },
+    {
+      "sr_no": "8",
+      "description": "Advanced Earthing systems",
+      "remark": "Included"
+    },
+    {
+      "sr_no": "9",
+      "description": "DISCOM Solar Conectivity Charges",
+      "remark": "Extra At Actual"
+    },
+    {
+      "sr_no": "10",
+      "description": "Solar Registration Fees",
+      "remark": "Included"
+    }
+  ],
+  "estimatedOtherChargesFooter": "As per Government Tender Norms",
+  "termsConditions": [
+    {
+      "sr_no": "1",
+      "parameter": "All taxes, Duties, Levies,Cess etc.",
+      "remark": "As above"
+    },
+    {
+      "sr_no": "2",
+      "parameter": "Payment Terms",
+      "remark": "20% Advance for Solar Registration\n80% Cost Before Solar Material Dispatch"
+    },
+    {
+      "sr_no": "3",
+      "parameter": "Supply,Erection & Commissioning Period",
+      "remark": "As per Gov Terms"
+    },
+    {
+      "sr_no": "4",
+      "parameter": "Validity period for this quote",
+      "remark": "03 day from the date of this offer"
+    },
+    {
+      "sr_no": "5",
+      "parameter": "All extra and additional material/work",
+      "remark": "As per the bill raised on actual expenditure"
+    },
+    {
+      "sr_no": "6",
+      "parameter": "Time Duration to Execute the Solar Project",
+      "remark": "60-75 days\nNote : Some Process depends on Government Departments and DISCOM officers."
+    }
+  ],
+  "warranty": [
+    {
+      "sr_no": "1",
+      "parameter": "SPV modules Product Warranty",
+      "remark": "10 to 12 Years  (as per Manufacturer terms)"
+    },
+    {
+      "sr_no": "1",
+      "parameter": "SPV modules Performance Warranty",
+      "remark": "27 to 30 Years for performance  (as per Manufacturer terms)\nPower degradation <1.0% in first year <0.40% / year in 2\n(as per Manufacturer terms)"
+    },
+    {
+      "sr_no": "2",
+      "parameter": "Inverter(for Manufacturing Defects)",
+      "remark": "7 to 10 Years  (as per Manufacturer terms)"
+    },
+    {
+      "sr_no": "3",
+      "parameter": "Solar System Warranty (Sunspot Energy LLP)",
+      "remark": "5-year on-site service, with module, inverter and switching device warranties as per OEM."
+    }
   ]
 }

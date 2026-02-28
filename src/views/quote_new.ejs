@@ -61,12 +61,30 @@
       <div class="grand">Grand Total: <span id="grand-total">0.00</span></div>
     </div>
 
+    <h2>ITEMS CONSIDERED FOR PROPOSAL</h2>
+    <div class="table-wrap proposal-wrap">
+      <table id="proposal-items-table">
+        <thead>
+          <tr>
+            <th>Sr.no</th>
+            <th>Description</th>
+            <th>Unit</th>
+            <th>Qty.</th>
+            <th>Specification</th>
+            <th>Make</th>
+          </tr>
+        </thead>
+        <tbody></tbody>
+      </table>
+    </div>
+
     <label class="notes">
       Notes / Terms (Optional)
       <textarea name="notes" rows="2" placeholder="Any extra notes or terms"><%= quote?.notes || '' %></textarea>
     </label>
 
     <input type="hidden" name="items_json" id="items-json" />
+    <input type="hidden" name="proposal_items_json" id="proposal-items-json" />
     <button type="submit" class="btn-primary"><%= submitLabel || 'Save & Download PDF' %></button>
   </form>
 </section>
@@ -74,6 +92,7 @@
 <script>
   window.PRESET_PRODUCTS = <%- JSON.stringify(products || []) %>;
   window.INITIAL_QUOTE_ITEMS = <%- JSON.stringify(initialItems || []) %>;
+  window.INITIAL_PROPOSAL_ITEMS = <%- JSON.stringify(initialProposalItems || []) %>;
 </script>
 
 <%- include('partials_footer') %>

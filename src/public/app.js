@@ -1,6 +1,8 @@
 (() => {
   const products = Array.isArray(window.PRESET_PRODUCTS) ? window.PRESET_PRODUCTS : [];
   const initialItems = Array.isArray(window.INITIAL_QUOTE_ITEMS) ? window.INITIAL_QUOTE_ITEMS : [];
+  const initialProposalItems = Array.isArray(window.INITIAL_PROPOSAL_ITEMS) ? window.INITIAL_PROPOSAL_ITEMS : [];
+
   const tableBody = document.querySelector('#items-table tbody');
   const addBtn = document.getElementById('add-item');
   const form = document.getElementById('quote-form');
@@ -8,6 +10,9 @@
   if (!tableBody || !addBtn || !form) {
     return;
   }
+
+  const proposalBody = document.querySelector('#proposal-items-table tbody');
+  const proposalItemsInput = document.getElementById('proposal-items-json');
 
   const dateInput = document.querySelector('input[name="quote_date"]');
   if (dateInput && !dateInput.value) {
@@ -148,6 +153,76 @@
     tableBody.appendChild(row);
   }
 
+  function renderProposalRows(rows) {
+    if (!proposalBody) {
+      return;
+    }
+
+    proposalBody.innerHTML = '';
+    rows.forEach((item) => {
+      const tr = document.createElement('tr');
+      const srNoTd = document.createElement('td');
+      srNoTd.textContent = item.sr_no || '';
+
+      const descriptionTd = document.createElement('td');
+      descriptionTd.textContent = item.description || '';
+
+      const unitTd = document.createElement('td');
+      unitTd.textContent = item.unit || '';
+
+      const qtyTd = document.createElement('td');
+      const qtyInput = document.createElement('input');
+      qtyInput.type = 'text';
+      qtyInput.className = 'proposal-qty';
+      qtyInput.value = item.qty || '';
+      qtyTd.appendChild(qtyInput);
+
+      const specificationTd = document.createElement('td');
+      specificationTd.textContent = item.specification || '';
+
+      const makeTd = document.createElement('td');
+      const makeInput = document.createElement('input');
+      makeInput.type = 'text';
+      makeInput.className = 'proposal-make';
+      makeInput.value = item.make || '';
+      makeTd.appendChild(makeInput);
+
+      tr.appendChild(srNoTd);
+      tr.appendChild(descriptionTd);
+      tr.appendChild(unitTd);
+      tr.appendChild(qtyTd);
+      tr.appendChild(specificationTd);
+      tr.appendChild(makeTd);
+
+      tr.dataset.srNo = item.sr_no || '';
+      tr.dataset.description = item.description || '';
+      tr.dataset.unit = item.unit || '';
+      tr.dataset.specification = item.specification || '';
+
+      proposalBody.appendChild(tr);
+    });
+  }
+
+  function collectProposalItems() {
+    if (!proposalBody) {
+      return [];
+    }
+
+    const rows = [];
+    proposalBody.querySelectorAll('tr').forEach((tr) => {
+      rows.push({
+        sr_no: tr.dataset.srNo || '',
+        description: tr.dataset.description || '',
+        unit: tr.dataset.unit || '',
+        specification: tr.dataset.specification || '',
+        qty: tr.querySelector('.proposal-qty')?.value?.trim() || '',
+        make: tr.querySelector('.proposal-make')?.value?.trim() || ''
+      });
+    });
+
+    return rows;
+  }
+
   addBtn.addEventListener('click', () => addRow());
 
   form.addEventListener('submit', (event) => {
@@ -178,11 +253,19 @@
     }
 
     document.getElementById('items-json').value = JSON.stringify(items);
+
+    if (proposalItemsInput) {
+      proposalItemsInput.value = JSON.stringify(collectProposalItems());
+    }
   });
 
   if (initialItems.length) {
     initialItems.forEach((item) => addRow(item));
   } else {
     addRow();
+  }
+
+  if (initialProposalItems.length) {
+    renderProposalRows(initialProposalItems);
   }
 })();

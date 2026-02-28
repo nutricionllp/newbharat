@@ -32,11 +32,18 @@ app.use((req, res, next) => {
   }
   next();
 });
+
 const PORT = process.env.PORT ? Number(process.env.PORT) : 3000;
 
 const company = JSON.parse(
   fs.readFileSync(path.join(__dirname, 'config', 'company.json'), 'utf8')
 );
+
+const proposalTemplate = Array.isArray(company.proposalTemplate) ? company.proposalTemplate : [];
+const estimatedOtherCharges = Array.isArray(company.estimatedOtherCharges) ? company.estimatedOtherCharges : [];
+const customerScopeRows = Array.isArray(company.customerScope) ? company.customerScope : [];
+const termsConditions = Array.isArray(company.termsConditions) ? company.termsConditions : [];
+const warrantyRows = Array.isArray(company.warranty) ? company.warranty : [];
 
 app.set('view engine', 'ejs');
 app.set('views', path.join(__dirname, 'views'));
@@ -60,6 +67,58 @@ function formatDate(dateValue) {
   const date = dateValue instanceof Date ? dateValue : new Date(dateValue);
   if (Number.isNaN(date.getTime())) return '';
   return date.toISOString().slice(0, 10);
+}
+
+function text(value) {
+  if (value === null || value === undefined) return '';
+  return String(value);
+}
+
+function normalizeProposalTemplateRow(row, index) {
+  return {
+    sr_no: text(row.sr_no || index + 1),
+    description: text(row.description),
+    unit: text(row.unit),
+    specification: text(row.specification),
+    qty: text(row.qty),
+    make: text(row.make)
+  };
+}
+
+function getDefaultProposalItems() {
+  return proposalTemplate.map(normalizeProposalTemplateRow);
+}
+
+function parseProposalItems(proposalItemsJson) {
+  const defaults = getDefaultProposalItems();
+  if (!defaults.length) {
+    return [];
+  }
+
+  let parsed = [];
+  try {
+    parsed = proposalItemsJson ? JSON.parse(proposalItemsJson) : [];
+  } catch (error) {
+    parsed = [];
+  }
+
+  if (!Array.isArray(parsed)) {
+    parsed = [];
+  }
+
+  return defaults.map((baseRow, idx) => {
+    const row = parsed[idx] || {};
+    const qtyValue = Object.prototype.hasOwnProperty.call(row, 'qty') ? text(row.qty) : baseRow.qty;
+    const makeValue = Object.prototype.hasOwnProperty.call(row, 'make') ? text(row.make) : baseRow.make;
+    return {
+      sr_no: baseRow.sr_no,
+      description: baseRow.description,
+      unit: baseRow.unit,
+      specification: baseRow.specification,
+      qty: qtyValue,
+      make: makeValue
+    };
+  });
 }
 
 function calculateItem(item) {
@@ -119,8 +178,28 @@ function buildQuoteSummary(items) {
   return { subtotal, cgstTotal, sgstTotal, total };
 }
 
+async function ensureQuoteEnhancements() {
+  const dbName = process.env.DB_NAME;
+  if (!dbName) {
+    return;
+  }
+
+  const [rows] = await pool.query(
+    `SELECT COUNT(*) AS count
+     FROM INFORMATION_SCHEMA.COLUMNS
+     WHERE TABLE_SCHEMA = ? AND TABLE_NAME = 'quotes' AND COLUMN_NAME = 'proposal_items_json'`,
+    [dbName]
+  );
+
+  if (!rows[0].count) {
+    await pool.query('ALTER TABLE quotes ADD COLUMN proposal_items_json LONGTEXT NULL');
+  }
+}
+
 async function saveQuote({ body, quoteId }) {
   const items = parseItems(body.items_json || '[]');
+  const proposalItems = parseProposalItems(body.proposal_items_json || '[]');
+  const proposalItemsJson = JSON.stringify(proposalItems);
   const { subtotal, cgstTotal, sgstTotal, total } = buildQuoteSummary(items);
 
   const quoteDate = body.quote_date || new Date().toISOString().slice(0, 10);
@@ -140,8 +219,8 @@ async function saveQuote({ body, quoteId }) {
     if (!finalQuoteId) {
       const [insertResult] = await connection.query(
         `INSERT INTO quotes
-          (quote_no, quote_date, customer_name, customer_phone, customer_email, customer_address, customer_gstin, subtotal, cgst_total, sgst_total, total, notes)
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+          (quote_no, quote_date, customer_name, customer_phone, customer_email, customer_address, customer_gstin, proposal_items_json, subtotal, cgst_total, sgst_total, total, notes)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
         [
           null,
           quoteDate,
@@ -150,6 +229,7 @@ async function saveQuote({ body, quoteId }) {
           body.customer_email || null,
           body.customer_address || null,
           body.customer_gstin || null,
+          proposalItemsJson,
           subtotal,
           cgstTotal,
           sgstTotal,
@@ -170,7 +250,7 @@ async function saveQuote({ body, quoteId }) {
       await connection.query(
         `UPDATE quotes
          SET quote_date = ?, customer_name = ?, customer_phone = ?, customer_email = ?, customer_address = ?, customer_gstin = ?,
-             subtotal = ?, cgst_total = ?, sgst_total = ?, total = ?, notes = ?
+             proposal_items_json = ?, subtotal = ?, cgst_total = ?, sgst_total = ?, total = ?, notes = ?
          WHERE id = ?`,
         [
           quoteDate,
@@ -179,6 +259,7 @@ async function saveQuote({ body, quoteId }) {
           body.customer_email || null,
           body.customer_address || null,
           body.customer_gstin || null,
+          proposalItemsJson,
           subtotal,
           cgstTotal,
           sgstTotal,
@@ -247,13 +328,115 @@ async function loadQuote(quoteId) {
     gst_rate: Number(item.gst_rate || 0)
   }));
 
+  const proposalItems = parseProposalItems(quote.proposal_items_json);
+
   return {
     quote: {
       ...quote,
       quote_date_display: formatDate(quote.quote_date)
     },
-    items
+    items,
+    proposalItems
   };
+}
+
+function drawTable(doc, {
+  title,
+  columns,
+  rows,
+  startY,
+  x = 40,
+  drawTitleOnNewPage = true
+}) {
+  const totalWidth = columns.reduce((sum, col) => sum + col.width, 0);
+  const pageBottom = doc.page.height - doc.page.margins.bottom;
+  const titleHeight = title ? 24 : 0;
+  const headerHeight = 24;
+
+  let y = startY;
+
+  function drawTitleRow(textValue) {
+    doc.save();
+    doc.rect(x, y, totalWidth, titleHeight).fill('#ececec');
+    doc.restore();
+    doc.rect(x, y, totalWidth, titleHeight).stroke();
+    doc.font('Helvetica-Bold').fontSize(12).text(textValue, x, y + 6, { width: totalWidth, align: 'center' });
+    y += titleHeight;
+  }
+
+  function drawHeaderRow() {
+    doc.save();
+    doc.rect(x, y, totalWidth, headerHeight).fill('#f4f4f4');
+    doc.restore();
+    doc.rect(x, y, totalWidth, headerHeight).stroke();
+
+    let xCursor = x;
+    columns.forEach((col) => {
+      doc.rect(xCursor, y, col.width, headerHeight).stroke();
+      doc.font('Helvetica-Bold').fontSize(10).text(col.label, xCursor + 4, y + 6, {
+        width: col.width - 8,
+        align: col.align || 'left'
+      });
+      xCursor += col.width;
+    });
+
+    y += headerHeight;
+  }
+
+  if (title) {
+    if (y + titleHeight + headerHeight > pageBottom) {
+      doc.addPage();
+      y = doc.page.margins.top;
+    }
+    drawTitleRow(title);
+  }
+
+  if (y + headerHeight > pageBottom) {
+    doc.addPage();
+    y = doc.page.margins.top;
+    if (title && drawTitleOnNewPage) {
+      drawTitleRow(title);
+    }
+  }
+  drawHeaderRow();
+
+  rows.forEach((row) => {
+    const rowValues = columns.map((col) => text(row[col.key] || ''));
+    const rowHeight = Math.max(
+      24,
+      ...rowValues.map((value, idx) => {
+        const col = columns[idx];
+        const cellHeight = doc.heightOfString(value, {
+          width: col.width - 8,
+          align: col.align || 'left'
+        });
+        return cellHeight + 8;
+      })
+    );
+
+    if (y + rowHeight > pageBottom) {
+      doc.addPage();
+      y = doc.page.margins.top;
+      if (title && drawTitleOnNewPage) {
+        drawTitleRow(title);
+      }
+      drawHeaderRow();
+    }
+
+    let xCursor = x;
+    columns.forEach((col, idx) => {
+      doc.rect(xCursor, y, col.width, rowHeight).stroke();
+      doc.font('Helvetica').fontSize(10).text(rowValues[idx], xCursor + 4, y + 4, {
+        width: col.width - 8,
+        align: col.align || 'left'
+      });
+      xCursor += col.width;
+    });
+
+    y += rowHeight;
+  });
+
+  return y;
 }
 
 app.get('/', asyncHandler(async (req, res) => {
@@ -265,7 +448,8 @@ app.get('/', asyncHandler(async (req, res) => {
     formAction: '/quotes',
     submitLabel: 'Save & Download PDF',
     quote: null,
-    initialItems: []
+    initialItems: [],
+    initialProposalItems: getDefaultProposalItems()
   });
 }));
 
@@ -363,7 +547,8 @@ app.get('/quotes/:id/edit', asyncHandler(async (req, res) => {
     formAction: `/quotes/${id}`,
     submitLabel: 'Update & Download PDF',
     quote: loaded.quote,
-    initialItems: loaded.items
+    initialItems: loaded.items,
+    initialProposalItems: loaded.proposalItems
   });
 }));
 
@@ -381,6 +566,8 @@ app.get('/quotes/:id/pdf', asyncHandler(async (req, res) => {
   if (!quote) {
     return res.status(404).send('Quote not found');
   }
+
+  const proposalItems = parseProposalItems(quote.proposal_items_json);
 
   const doc = new PDFDocument({ margin: 40, size: 'A4' });
   const fileName = `${quote.quote_no || `quote-${id}`}.pdf`;
@@ -474,7 +661,6 @@ app.get('/quotes/:id/pdf', asyncHandler(async (req, res) => {
     y += 20;
   });
 
-  doc.moveDown();
   doc
     .fontSize(10)
     .text(`Subtotal: ${Number(quote.subtotal).toFixed(2)}`, 350, y + 10, { align: 'right', width: 200 })
@@ -483,20 +669,87 @@ app.get('/quotes/:id/pdf', asyncHandler(async (req, res) => {
     .fontSize(12)
     .text(`Grand Total: ${Number(quote.total).toFixed(2)}`, 350, y + 60, { align: 'right', width: 200 });
 
-  const termsY = y + 90;
-  doc.fontSize(9).text('Terms & Notes:', 40, termsY);
+  let sectionY = y + 100;
 
-  const terms = [];
-  if (company.terms && Array.isArray(company.terms)) {
-    terms.push(...company.terms);
+  sectionY = drawTable(doc, {
+    title: 'ITEMS CONSIDERED FOR PROPOSAL',
+    startY: sectionY,
+    columns: [
+      { key: 'sr_no', label: 'Sr.no', width: 40, align: 'center' },
+      { key: 'description', label: 'Description', width: 170 },
+      { key: 'unit', label: 'Unit', width: 60, align: 'center' },
+      { key: 'qty', label: 'Qty.', width: 70, align: 'center' },
+      { key: 'specification', label: 'Specification', width: 85, align: 'center' },
+      { key: 'make', label: 'Make', width: 90, align: 'center' }
+    ],
+    rows: proposalItems
+  }) + 12;
+
+  const estimatedRows = estimatedOtherCharges.map((row) => ({
+    item: row.item,
+    remark: row.remark
+  }));
+
+  if (company.estimatedOtherChargesFooter) {
+    estimatedRows.push({
+      item: company.estimatedOtherChargesFooter,
+      remark: ''
+    });
   }
+
+  sectionY = drawTable(doc, {
+    title: 'Estimated Other Charges',
+    startY: sectionY,
+    columns: [
+      { key: 'item', label: 'Particulars', width: 375, align: 'center' },
+      { key: 'remark', label: 'Status', width: 140, align: 'center' }
+    ],
+    rows: estimatedRows
+  }) + 12;
+
+  if (customerScopeRows.length) {
+    sectionY = drawTable(doc, {
+      title: 'Scope Of Work',
+      startY: sectionY,
+      columns: [
+        { key: 'sr_no', label: 'Sr.no', width: 45, align: 'center' },
+        { key: 'description', label: 'Description', width: 280 },
+        { key: 'remark', label: 'Customer Scope', width: 190, align: 'center' }
+      ],
+      rows: customerScopeRows
+    }) + 12;
+  }
+
+  sectionY = drawTable(doc, {
+    title: 'Terms & Conditions',
+    startY: sectionY,
+    columns: [
+      { key: 'sr_no', label: 'Sr.no', width: 45, align: 'center' },
+      { key: 'parameter', label: 'Parameters', width: 240 },
+      { key: 'remark', label: 'Remarks', width: 230, align: 'center' }
+    ],
+    rows: termsConditions
+  }) + 12;
+
+  sectionY = drawTable(doc, {
+    title: 'Warrantee',
+    startY: sectionY,
+    columns: [
+      { key: 'sr_no', label: 'Sr.no', width: 45, align: 'center' },
+      { key: 'parameter', label: 'Parameters', width: 240 },
+      { key: 'remark', label: 'Remarks', width: 230, align: 'center' }
+    ],
+    rows: warrantyRows
+  }) + 10;
+
   if (quote.notes) {
-    terms.push(quote.notes);
+    if (sectionY > doc.page.height - 100) {
+      doc.addPage();
+      sectionY = doc.page.margins.top;
+    }
+    doc.font('Helvetica-Bold').fontSize(10).text('Additional Note:', 40, sectionY);
+    doc.font('Helvetica').fontSize(10).text(quote.notes, 40, sectionY + 14, { width: 515 });
   }
-
-  terms.forEach((term, idx) => {
-    doc.text(`${idx + 1}. ${term}`, 40, termsY + 12 + idx * 12);
-  });
 
   doc.end();
 }));
@@ -506,6 +759,16 @@ app.use((error, req, res, next) => {
   res.status(400).send(error.message || 'Something went wrong.');
 });
 
-app.listen(PORT, () => {
-  console.log(`Server running on http://localhost:${PORT}`);
-});
+async function startServer() {
+  try {
+    await ensureQuoteEnhancements();
+    app.listen(PORT, () => {
+      console.log(`Server running on http://localhost:${PORT}`);
+    });
+  } catch (error) {
+    console.error('Failed to start server:', error.message);
+    process.exit(1);
+  }
+}
+
+startServer();
