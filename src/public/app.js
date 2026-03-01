@@ -21,6 +21,20 @@
     dateInput.value = today;
   }
 
+  function getDefaultProposalItems() {
+    return [
+      { sr_no: '1', description: 'Solar PV Modules - (Module Size having +-05 Wp variation)', unit: 'Nos', qty: '5', specification: '620', make: 'ADANI' },
+      { sr_no: '2', description: 'Module mounting structure', unit: 'Set', qty: 'As per design', specification: 'As per design', make: 'Hot Dip Galv. Iron 60x40 & 40x40' },
+      { sr_no: '3', description: 'String type Grid Tied Inverter as per availability', unit: 'Nos', qty: '1', specification: 'As per design', make: 'SOLARYAAN / XWATT' },
+      { sr_no: '4', description: 'DCDB with accessories', unit: 'Nos', qty: 'As per design', specification: 'As per design', make: 'L&T/HAVELLS' },
+      { sr_no: '5', description: 'ACDB with accessories', unit: 'Nos', qty: 'At actual', specification: 'As per design', make: 'L&T/HAVELLS' },
+      { sr_no: '6', description: 'DC Wire with UV protected - TUV Certified', unit: 'Mtr.', qty: 'At actual', specification: 'As per design', make: 'POLYCAB' },
+      { sr_no: '7', description: 'AC Wire - TUV Certified', unit: 'Mtr.', qty: 'At actual', specification: 'As per design', make: 'POLYCAB' },
+      { sr_no: '8', description: 'Advanced Chemical Earthing systems', unit: 'Nos', qty: 'As per design', specification: 'As per design', make: 'Standard' },
+      { sr_no: '9', description: 'Lightening arrester', unit: 'Nos', qty: 'As per design', specification: 'As per design', make: 'Standard' }
+    ];
+  }
+
   function createSelect() {
     const select = document.createElement('select');
     const customOption = document.createElement('option');
@@ -259,5 +273,9 @@
     addRow();
   }
 
-  // Proposal rows are server-rendered to avoid browser-cache JS mismatches.
+  // Defensive fallback: if server-rendered rows are missing, inject defaults.
+  if (proposalBody && proposalBody.querySelectorAll('tr').length === 0) {
+    const seedRows = initialProposalItems.length ? initialProposalItems : getDefaultProposalItems();
+    seedRows.forEach((row) => addProposalRow(row));
+  }
 })();
