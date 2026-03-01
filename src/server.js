@@ -20,7 +20,7 @@ function withBase(pathname) {
 
 app.use((req, res, next) => {
   res.locals.basePath = normalizedBasePath;
-  res.locals.assetVersion = '20260228-4';
+  res.locals.assetVersion = '20260301-1';
 
   if (!normalizedBasePath) {
     return next();
@@ -168,16 +168,26 @@ function getDefaultProposalItems() {
 }
 
 function parseProposalItems(proposalItemsJson, formBody = null) {
-  const defaults = getDefaultProposalItems();
-  if (!defaults.length) {
-    return [];
-  }
-
   let parsed = [];
   try {
     parsed = proposalItemsJson ? JSON.parse(proposalItemsJson) : [];
   } catch (error) {
     parsed = [];
+  }
+
+  if (Array.isArray(parsed) && parsed.length) {
+    const normalized = parsed.map((row, idx) => normalizeProposalTemplateRow(row || {}, idx));
+    const filtered = normalized.filter(
+      (row) => row.sr_no || row.description || row.unit || row.qty || row.specification || row.make
+    );
+    if (filtered.length) {
+      return filtered;
+    }
+  }
+
+  const defaults = getDefaultProposalItems();
+  if (!defaults.length) {
+    return [];
   }
 
   if (!Array.isArray(parsed)) {

@@ -13,6 +13,7 @@
 
   const proposalBody = document.querySelector('#proposal-items-table tbody');
   const proposalItemsInput = document.getElementById('proposal-items-json');
+  const addProposalBtn = document.getElementById('add-proposal-item');
 
   const dateInput = document.querySelector('input[name="quote_date"]');
   if (dateInput && !dateInput.value) {
@@ -160,20 +161,63 @@
 
     const rows = [];
     proposalBody.querySelectorAll('tr').forEach((tr) => {
+      const srNo = tr.querySelector('.proposal-sr-no')?.value?.trim() || '';
+      const description = tr.querySelector('.proposal-description')?.value?.trim() || '';
+      const unit = tr.querySelector('.proposal-unit')?.value?.trim() || '';
+      const qty = tr.querySelector('.proposal-qty')?.value?.trim() || '';
+      const specification = tr.querySelector('.proposal-specification')?.value?.trim() || '';
+      const make = tr.querySelector('.proposal-make')?.value?.trim() || '';
+
+      // Skip completely blank rows.
+      if (!srNo && !description && !unit && !qty && !specification && !make) {
+        return;
+      }
+
       rows.push({
-        sr_no: tr.dataset.srNo || '',
-        description: tr.dataset.description || '',
-        unit: tr.dataset.unit || '',
-        specification: tr.querySelector('.proposal-specification')?.value?.trim() || '',
-        qty: tr.querySelector('.proposal-qty')?.value?.trim() || '',
-        make: tr.querySelector('.proposal-make')?.value?.trim() || ''
+        sr_no: srNo,
+        description,
+        unit,
+        specification,
+        qty,
+        make
       });
     });
 
     return rows;
   }
 
+  function addProposalRow(initial = {}) {
+    if (!proposalBody) {
+      return;
+    }
+
+    const tr = document.createElement('tr');
+    const fields = [
+      { cls: 'proposal-sr-no', value: initial.sr_no || '' },
+      { cls: 'proposal-description', value: initial.description || '' },
+      { cls: 'proposal-unit', value: initial.unit || '' },
+      { cls: 'proposal-qty', value: initial.qty || '' },
+      { cls: 'proposal-specification', value: initial.specification || '' },
+      { cls: 'proposal-make', value: initial.make || '' }
+    ];
+
+    fields.forEach((field) => {
+      const td = document.createElement('td');
+      const input = document.createElement('input');
+      input.type = 'text';
+      input.className = field.cls;
+      input.value = field.value;
+      td.appendChild(input);
+      tr.appendChild(td);
+    });
+
+    proposalBody.appendChild(tr);
+  }
+
   addBtn.addEventListener('click', () => addRow());
+  if (addProposalBtn) {
+    addProposalBtn.addEventListener('click', () => addProposalRow());
+  }
 
   form.addEventListener('submit', (event) => {
     const items = [];

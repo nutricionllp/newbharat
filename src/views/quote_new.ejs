@@ -79,28 +79,31 @@
             ? initialProposalItems
             : ((company && Array.isArray(company.proposalTemplate)) ? company.proposalTemplate : []); %>
           <% proposalRows.forEach((item, idx) => { %>
-            <tr
-              data-sr-no="<%= item.sr_no || '' %>"
-              data-description="<%= item.description || '' %>"
-              data-unit="<%= item.unit || '' %>"
-            >
-              <td><%= item.sr_no || '' %></td>
-              <td><%= item.description || '' %></td>
-              <td><%= item.unit || '' %></td>
+            <tr>
               <td>
-                <input type="text" class="proposal-qty" name="proposal_qty_<%= idx %>" value="<%= item.qty || '' %>" />
+                <input type="text" class="proposal-sr-no" value="<%= item.sr_no || '' %>" />
               </td>
               <td>
-                <input type="text" class="proposal-specification" name="proposal_specification_<%= idx %>" value="<%= item.specification || '' %>" />
+                <input type="text" class="proposal-description" value="<%= item.description || '' %>" />
               </td>
               <td>
-                <input type="text" class="proposal-make" name="proposal_make_<%= idx %>" value="<%= item.make || '' %>" />
+                <input type="text" class="proposal-unit" value="<%= item.unit || '' %>" />
+              </td>
+              <td>
+                <input type="text" class="proposal-qty" value="<%= item.qty || '' %>" />
+              </td>
+              <td>
+                <input type="text" class="proposal-specification" value="<%= item.specification || '' %>" />
+              </td>
+              <td>
+                <input type="text" class="proposal-make" value="<%= item.make || '' %>" />
               </td>
             </tr>
           <% }) %>
         </tbody>
       </table>
     </div>
+    <button type="button" id="add-proposal-item" class="btn-secondary">+ Add Proposal Row</button>
 
     <label class="notes">
       Notes / Terms (Optional)
