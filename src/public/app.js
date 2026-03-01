@@ -15,6 +15,43 @@
   const proposalItemsInput = document.getElementById('proposal-items-json');
   const addProposalBtn = document.getElementById('add-proposal-item');
 
+  function syncLegacyProposalInputs(rows) {
+    const legacyContainerId = 'proposal-legacy-fields';
+    const existing = document.getElementById(legacyContainerId);
+    if (existing) {
+      existing.remove();
+    }
+
+    if (!rows.length) {
+      return;
+    }
+
+    const wrapper = document.createElement('div');
+    wrapper.id = legacyContainerId;
+    wrapper.style.display = 'none';
+
+    rows.forEach((row, idx) => {
+      const mapping = [
+        ['proposal_sr_no', row.sr_no || ''],
+        ['proposal_description', row.description || ''],
+        ['proposal_unit', row.unit || ''],
+        ['proposal_qty', row.qty || ''],
+        ['proposal_specification', row.specification || ''],
+        ['proposal_make', row.make || '']
+      ];
+
+      mapping.forEach(([name, value]) => {
+        const input = document.createElement('input');
+        input.type = 'hidden';
+        input.name = `${name}_${idx}`;
+        input.value = value;
+        wrapper.appendChild(input);
+      });
+    });
+
+    form.appendChild(wrapper);
+  }
+
   const dateInput = document.querySelector('input[name="quote_date"]');
   if (dateInput && !dateInput.value) {
     const today = new Date().toISOString().slice(0, 10);
@@ -263,7 +300,9 @@
     document.getElementById('items-json').value = JSON.stringify(items);
 
     if (proposalItemsInput) {
-      proposalItemsInput.value = JSON.stringify(collectProposalItems());
+      const proposalRows = collectProposalItems();
+      proposalItemsInput.value = JSON.stringify(proposalRows);
+      syncLegacyProposalInputs(proposalRows);
     }
   });
 

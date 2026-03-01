@@ -20,7 +20,7 @@ function withBase(pathname) {
 
 app.use((req, res, next) => {
   res.locals.basePath = normalizedBasePath;
-  res.locals.assetVersion = '20260301-1';
+  res.locals.assetVersion = '20260301-2';
 
   if (!normalizedBasePath) {
     return next();
@@ -167,7 +167,108 @@ function getDefaultProposalItems() {
   return proposalTemplate.map(normalizeProposalTemplateRow);
 }
 
+function isObject(value) {
+  return Boolean(value) && typeof value === 'object' && !Array.isArray(value);
+}
+
+function hasOwn(obj, key) {
+  return Object.prototype.hasOwnProperty.call(obj, key);
+}
+
+function readFieldFromObject(obj, keys) {
+  if (!isObject(obj)) {
+    return { found: false, value: undefined };
+  }
+
+  for (const key of keys) {
+    if (hasOwn(obj, key)) {
+      return { found: true, value: obj[key] };
+    }
+  }
+
+  return { found: false, value: undefined };
+}
+
+function readProposalField({ row, rowKeys, formBody, formKeys, fallback }) {
+  const rowResult = readFieldFromObject(row, rowKeys);
+  if (rowResult.found) {
+    return text(rowResult.value);
+  }
+
+  if (isObject(formBody)) {
+    for (const key of formKeys) {
+      if (hasOwn(formBody, key)) {
+        return text(formBody[key]);
+      }
+    }
+  }
+
+  return text(fallback);
+}
+
+function normalizeProposalRowByIndex({ row, idx, defaults, formBody }) {
+  const baseRow = defaults[idx] || {};
+
+  return {
+    sr_no: readProposalField({
+      row,
+      rowKeys: ['sr_no', 'srNo', 'srno', 'sr'],
+      formBody,
+      formKeys: [`proposal_sr_no_${idx}`, `proposal_srno_${idx}`],
+      fallback: baseRow.sr_no || idx + 1
+    }),
+    description: readProposalField({
+      row,
+      rowKeys: ['description', 'desc'],
+      formBody,
+      formKeys: [`proposal_description_${idx}`],
+      fallback: baseRow.description || ''
+    }),
+    unit: readProposalField({
+      row,
+      rowKeys: ['unit'],
+      formBody,
+      formKeys: [`proposal_unit_${idx}`],
+      fallback: baseRow.unit || ''
+    }),
+    qty: readProposalField({
+      row,
+      rowKeys: ['qty', 'quantity'],
+      formBody,
+      formKeys: [`proposal_qty_${idx}`, `proposal_quantity_${idx}`],
+      fallback: baseRow.qty || ''
+    }),
+    specification: readProposalField({
+      row,
+      rowKeys: ['specification', 'spec', 'specs'],
+      formBody,
+      formKeys: [`proposal_specification_${idx}`, `proposal_spec_${idx}`],
+      fallback: baseRow.specification || ''
+    }),
+    make: readProposalField({
+      row,
+      rowKeys: ['make', 'brand'],
+      formBody,
+      formKeys: [`proposal_make_${idx}`],
+      fallback: baseRow.make || ''
+    })
+  };
+}
+
+function hasProposalContent(row) {
+  return Boolean(
+    row.sr_no ||
+    row.description ||
+    row.unit ||
+    row.qty ||
+    row.specification ||
+    row.make
+  );
+}
+
 function parseProposalItems(proposalItemsJson, formBody = null) {
+  const defaults = getDefaultProposalItems();
+
   let parsed = [];
   try {
     parsed = proposalItemsJson ? JSON.parse(proposalItemsJson) : [];
@@ -176,49 +277,45 @@ function parseProposalItems(proposalItemsJson, formBody = null) {
   }
 
   if (Array.isArray(parsed) && parsed.length) {
-    const normalized = parsed.map((row, idx) => normalizeProposalTemplateRow(row || {}, idx));
-    const filtered = normalized.filter(
-      (row) => row.sr_no || row.description || row.unit || row.qty || row.specification || row.make
-    );
-    if (filtered.length) {
-      return filtered;
+    const normalized = parsed
+      .map((row, idx) => normalizeProposalRowByIndex({
+        row: isObject(row) ? row : {},
+        idx,
+        defaults,
+        formBody
+      }))
+      .filter(hasProposalContent);
+
+    if (normalized.length) {
+      return normalized;
     }
   }
 
-  const defaults = getDefaultProposalItems();
-  if (!defaults.length) {
-    return [];
+  if (isObject(formBody)) {
+    const indexedKeys = Object.keys(formBody)
+      .map((key) => {
+        const match = key.match(/^proposal_(?:sr_no|srno|description|unit|qty|quantity|specification|spec|make)_(\d+)$/);
+        return match ? Number(match[1]) : null;
+      })
+      .filter((idx) => Number.isInteger(idx));
+
+    if (indexedKeys.length) {
+      const uniqueSortedIndexes = [...new Set(indexedKeys)].sort((a, b) => a - b);
+      const rowsFromForm = uniqueSortedIndexes
+        .map((idx) => normalizeProposalRowByIndex({ row: {}, idx, defaults, formBody }))
+        .filter(hasProposalContent);
+
+      if (rowsFromForm.length) {
+        return rowsFromForm;
+      }
+    }
   }
 
-  if (!Array.isArray(parsed)) {
-    parsed = [];
+  if (defaults.length) {
+    return defaults;
   }
 
-  return defaults.map((baseRow, idx) => {
-    const row = parsed[idx] || {};
-    const hasFormBody = formBody && typeof formBody === 'object';
-    const formQty = hasFormBody ? formBody[`proposal_qty_${idx}`] : undefined;
-    const formSpecification = hasFormBody ? formBody[`proposal_specification_${idx}`] : undefined;
-    const formMake = hasFormBody ? formBody[`proposal_make_${idx}`] : undefined;
-
-    const qtyValue = formQty !== undefined
-      ? text(formQty)
-      : (Object.prototype.hasOwnProperty.call(row, 'qty') ? text(row.qty) : baseRow.qty);
-    const specificationValue = formSpecification !== undefined
-      ? text(formSpecification)
-      : (Object.prototype.hasOwnProperty.call(row, 'specification') ? text(row.specification) : baseRow.specification);
-    const makeValue = formMake !== undefined
-      ? text(formMake)
-      : (Object.prototype.hasOwnProperty.call(row, 'make') ? text(row.make) : baseRow.make);
-    return {
-      sr_no: baseRow.sr_no,
-      description: baseRow.description,
-      unit: baseRow.unit,
-      specification: specificationValue,
-      qty: qtyValue,
-      make: makeValue
-    };
-  });
+  return [];
 }
 
 function calculateItem(item) {
