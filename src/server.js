@@ -126,12 +126,16 @@ const customerScopeRows = Array.isArray(company.customerScope) ? company.custome
 const termsConditions = Array.isArray(company.termsConditions) ? company.termsConditions : [];
 const warrantyRows = Array.isArray(company.warranty) ? company.warranty : [];
 const authConfig = {
-  username: process.env.APP_LOGIN_USERNAME || 'HelloBharat',
-  password: process.env.APP_LOGIN_PASSWORD || 'Hello@0109',
-  secret: process.env.AUTH_SECRET || 'new-bharat-auth-secret-change-this',
+  username: text(process.env.APP_LOGIN_USERNAME).trim(),
+  password: text(process.env.APP_LOGIN_PASSWORD),
+  secret: text(process.env.AUTH_SECRET),
   cookieName: 'nb_auth',
   cookieMaxAgeSeconds: 60 * 60 * 12
 };
+
+if (!authConfig.username || !authConfig.password || !authConfig.secret) {
+  throw new Error('Missing required env vars: APP_LOGIN_USERNAME, APP_LOGIN_PASSWORD, AUTH_SECRET');
+}
 
 app.set('view engine', 'ejs');
 app.set('views', path.join(__dirname, 'views'));

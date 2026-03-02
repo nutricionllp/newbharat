@@ -12,7 +12,12 @@ A simple quotation system for a solar business in Gujarat. It supports preset pr
 ## Setup
 1. Copy `.env.example` to `.env` and fill your MySQL credentials.
 2. For cPanel subpath hosting, set `APP_BASE_PATH=/NewQuotation` in `.env`.
-3. Create the database and run the schema:
+3. Set login/auth environment variables in `.env`:
+   - `APP_LOGIN_USERNAME`
+   - `APP_LOGIN_PASSWORD`
+   - `AUTH_SECRET` (long random string)
+   - `AUTH_COOKIE_SECURE=true` on HTTPS production
+4. Create the database and run the schema:
 
 ```sql
 -- Example (run inside your MySQL client)
@@ -21,8 +26,8 @@ USE solar_quotes;
 SOURCE src/db/schema.sql;
 ```
 
-4. Replace the logo image at `src/public/logo.png` with your logo.
-5. Install dependencies and run:
+5. Replace the logo image at `src/public/logo.png` with your logo.
+6. Install dependencies and run:
 
 ```bash
 npm install
