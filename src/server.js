@@ -20,8 +20,8 @@ function withBase(pathname) {
 
 app.use((req, res, next) => {
   res.locals.basePath = normalizedBasePath;
-  res.locals.assetVersion = '20260302-4';
-  res.setHeader('X-NewBharat-Build', '20260302-4');
+  res.locals.assetVersion = '20260303-1';
+  res.setHeader('X-NewBharat-Build', '20260303-1');
 
   if (!normalizedBasePath) {
     return next();
@@ -833,6 +833,11 @@ function buildFallbackPdfLines({ quote, items, proposalItems }) {
     lines.push(`Additional Note: ${quote.notes}`);
   }
 
+  lines.push('');
+  lines.push(`FOR, ${company.name || 'New Bharat Enterprise'}`);
+  lines.push('(Stamp of Company)');
+  lines.push('Signatory Authorized');
+
   return lines.flatMap((line) => wrapPdfLine(line));
 }
 
@@ -915,6 +920,63 @@ function createSimplePdfBuffer(lines) {
 function isPdfkitFontDataError(error) {
   const message = String(error && error.message ? error.message : error);
   return message.includes('Helvetica.afm') || (message.includes('/pdfkit/') && message.includes('/data/'));
+}
+
+function getCompanyStampPath() {
+  const candidates = [
+    path.join(__dirname, 'public', 'stamp.png'),
+    path.join(__dirname, 'public', 'stamp.jpg'),
+    path.join(__dirname, 'public', 'stamp.jpeg'),
+    path.join(__dirname, 'public', 'company-stamp.png')
+  ];
+
+  for (const candidate of candidates) {
+    if (fs.existsSync(candidate)) {
+      return candidate;
+    }
+  }
+
+  return null;
+}
+
+function drawSignatorySection(doc, startY) {
+  const sectionHeight = 150;
+  let y = startY;
+  const pageBottom = doc.page.height - doc.page.margins.bottom;
+  const sectionX = 330;
+  const sectionWidth = 220;
+
+  if (y + sectionHeight > pageBottom) {
+    doc.addPage();
+    y = doc.page.margins.top;
+  }
+
+  doc.font('Helvetica-Bold').fontSize(11).text(`FOR, ${company.name || 'New Bharat Enterprise'}`, sectionX, y, {
+    width: sectionWidth
+  });
+
+  const stampPath = getCompanyStampPath();
+  const stampY = y + 18;
+
+  if (stampPath) {
+    doc.image(stampPath, sectionX + 40, stampY, { fit: [130, 96], align: 'center', valign: 'center' });
+    doc.font('Helvetica').fontSize(10).text('(Stamp of Company)', sectionX, stampY + 100, {
+      width: sectionWidth,
+      align: 'center'
+    });
+  } else {
+    doc.font('Helvetica').fontSize(10).text('(Stamp of Company)', sectionX, stampY + 42, {
+      width: sectionWidth,
+      align: 'center'
+    });
+  }
+
+  doc.font('Helvetica').fontSize(11).text('Signatory Authorized', sectionX, y + 132, {
+    width: sectionWidth,
+    align: 'center'
+  });
+
+  return y + sectionHeight;
 }
 
 function generatePdfKitBuffer({ quote, items, proposalItems, quoteId }) {
@@ -1100,7 +1162,11 @@ function generatePdfKitBuffer({ quote, items, proposalItems, quoteId }) {
         }
         doc.font('Helvetica-Bold').fontSize(10).text('Additional Note:', 40, sectionY);
         doc.font('Helvetica').fontSize(10).text(quote.notes, 40, sectionY + 14, { width: 515 });
+        const noteHeight = doc.heightOfString(quote.notes, { width: 515 });
+        sectionY += noteHeight + 28;
       }
+
+      drawSignatorySection(doc, sectionY + 12);
 
       doc.end();
     } catch (error) {
