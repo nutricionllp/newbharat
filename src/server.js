@@ -20,7 +20,7 @@ function withBase(pathname) {
 
 app.use((req, res, next) => {
   res.locals.basePath = normalizedBasePath;
-  res.locals.assetVersion = '20260301-2';
+  res.locals.assetVersion = '20260302-1';
 
   if (!normalizedBasePath) {
     return next();
@@ -190,17 +190,17 @@ function readFieldFromObject(obj, keys) {
 }
 
 function readProposalField({ row, rowKeys, formBody, formKeys, fallback }) {
-  const rowResult = readFieldFromObject(row, rowKeys);
-  if (rowResult.found) {
-    return text(rowResult.value);
-  }
-
   if (isObject(formBody)) {
     for (const key of formKeys) {
       if (hasOwn(formBody, key)) {
         return text(formBody[key]);
       }
     }
+  }
+
+  const rowResult = readFieldFromObject(row, rowKeys);
+  if (rowResult.found) {
+    return text(rowResult.value);
   }
 
   return text(fallback);
@@ -274,6 +274,15 @@ function parseProposalItems(proposalItemsJson, formBody = null) {
     parsed = proposalItemsJson ? JSON.parse(proposalItemsJson) : [];
   } catch (error) {
     parsed = [];
+  }
+
+  // Support double-encoded payloads (stringified JSON string).
+  if (typeof parsed === 'string') {
+    try {
+      parsed = parsed ? JSON.parse(parsed) : [];
+    } catch (error) {
+      parsed = [];
+    }
   }
 
   if (Array.isArray(parsed) && parsed.length) {
