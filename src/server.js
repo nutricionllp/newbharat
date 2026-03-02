@@ -20,8 +20,8 @@ function withBase(pathname) {
 
 app.use((req, res, next) => {
   res.locals.basePath = normalizedBasePath;
-  res.locals.assetVersion = '20260302-2';
-  res.setHeader('X-NewBharat-Build', '20260302-2');
+  res.locals.assetVersion = '20260302-3';
+  res.setHeader('X-NewBharat-Build', '20260302-3');
 
   if (!normalizedBasePath) {
     return next();
@@ -176,6 +176,20 @@ function hasOwn(obj, key) {
   return Object.prototype.hasOwnProperty.call(obj, key);
 }
 
+function firstValue(value) {
+  if (!Array.isArray(value)) {
+    return value;
+  }
+
+  for (const candidate of value) {
+    if (candidate !== null && candidate !== undefined && String(candidate).trim() !== '') {
+      return candidate;
+    }
+  }
+
+  return value.length ? value[0] : '';
+}
+
 function readFieldFromObject(obj, keys) {
   if (!isObject(obj)) {
     return { found: false, value: undefined };
@@ -183,7 +197,7 @@ function readFieldFromObject(obj, keys) {
 
   for (const key of keys) {
     if (hasOwn(obj, key)) {
-      return { found: true, value: obj[key] };
+      return { found: true, value: firstValue(obj[key]) };
     }
   }
 
