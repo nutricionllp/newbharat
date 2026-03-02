@@ -672,6 +672,415 @@ function drawTable(doc, {
   return y;
 }
 
+function formatMoney(value) {
+  return Number(value || 0).toFixed(2);
+}
+
+function sanitizePdfLine(value) {
+  return String(value || '')
+    .replace(/\s+/g, ' ')
+    .replace(/[^\x20-\x7E]/g, ' ')
+    .trim();
+}
+
+function escapePdfText(value) {
+  return sanitizePdfLine(value)
+    .replace(/\\/g, '\\\\')
+    .replace(/\(/g, '\\(')
+    .replace(/\)/g, '\\)');
+}
+
+function wrapPdfLine(line, maxChars = 110) {
+  const clean = sanitizePdfLine(line);
+  if (!clean) {
+    return [''];
+  }
+
+  const words = clean.split(' ');
+  const out = [];
+  let current = '';
+
+  words.forEach((word) => {
+    if (!current) {
+      current = word;
+      return;
+    }
+
+    const candidate = `${current} ${word}`;
+    if (candidate.length <= maxChars) {
+      current = candidate;
+      return;
+    }
+
+    out.push(current);
+    current = word;
+  });
+
+  if (current) {
+    out.push(current);
+  }
+
+  return out.length ? out : [''];
+}
+
+function buildFallbackPdfLines({ quote, items, proposalItems }) {
+  const lines = [];
+
+  lines.push(company.name || 'Quotation');
+  if (company.tagline) lines.push(company.tagline);
+  if (company.address) lines.push(company.address);
+  if (company.phone) lines.push(`Phone: ${company.phone}`);
+  if (company.email) lines.push(`Email: ${company.email}`);
+  if (company.gstin) lines.push(`GSTIN: ${company.gstin}`);
+
+  lines.push('');
+  lines.push('QUOTATION');
+  lines.push(`Quote No: ${quote.quote_no || '-'}`);
+  lines.push(`Date: ${formatDate(quote.quote_date)}`);
+  lines.push(`Customer: ${quote.customer_name || '-'}`);
+  lines.push(`Phone: ${quote.customer_phone || '-'}`);
+  lines.push(`Email: ${quote.customer_email || '-'}`);
+  lines.push(`Customer GSTIN: ${quote.customer_gstin || '-'}`);
+  lines.push(`Address: ${quote.customer_address || '-'}`);
+
+  lines.push('');
+  lines.push('ITEMS');
+  items.forEach((item, index) => {
+    lines.push(
+      `${index + 1}. ${item.name || '-'} | HSN: ${item.hsn || '-'} | Qty: ${item.qty || 0} | ` +
+      `Rate: ${formatMoney(item.unit_price)} | GST: ${formatMoney(item.gst_rate)}% | Total: ${formatMoney(item.total)}`
+    );
+  });
+  lines.push(`Subtotal: ${formatMoney(quote.subtotal)}`);
+  lines.push(`CGST: ${formatMoney(quote.cgst_total)}`);
+  lines.push(`SGST: ${formatMoney(quote.sgst_total)}`);
+  lines.push(`Grand Total: ${formatMoney(quote.total)}`);
+
+  lines.push('');
+  lines.push('ITEMS CONSIDERED FOR PROPOSAL');
+  proposalItems.forEach((row) => {
+    lines.push(
+      `${row.sr_no || '-'} | ${row.description || '-'} | Unit: ${row.unit || '-'} | ` +
+      `Qty: ${row.qty || '-'} | Specification: ${row.specification || '-'} | Make: ${row.make || '-'}`
+    );
+  });
+
+  if (estimatedOtherCharges.length) {
+    lines.push('');
+    lines.push('ESTIMATED OTHER CHARGES');
+    estimatedOtherCharges.forEach((row) => {
+      lines.push(`${row.item || '-'} | ${row.remark || '-'}`);
+    });
+    if (company.estimatedOtherChargesFooter) {
+      lines.push(company.estimatedOtherChargesFooter);
+    }
+  }
+
+  if (customerScopeRows.length) {
+    lines.push('');
+    lines.push('SCOPE OF WORK');
+    customerScopeRows.forEach((row) => {
+      lines.push(`${row.sr_no || '-'} | ${row.description || '-'} | ${row.remark || '-'}`);
+    });
+  }
+
+  if (termsConditions.length) {
+    lines.push('');
+    lines.push('TERMS & CONDITIONS');
+    termsConditions.forEach((row) => {
+      lines.push(`${row.sr_no || '-'} | ${row.parameter || '-'} | ${row.remark || '-'}`);
+    });
+  }
+
+  if (warrantyRows.length) {
+    lines.push('');
+    lines.push('WARRANTEE');
+    warrantyRows.forEach((row) => {
+      lines.push(`${row.sr_no || '-'} | ${row.parameter || '-'} | ${row.remark || '-'}`);
+    });
+  }
+
+  if (quote.notes) {
+    lines.push('');
+    lines.push(`Additional Note: ${quote.notes}`);
+  }
+
+  return lines.flatMap((line) => wrapPdfLine(line));
+}
+
+function createSimplePdfBuffer(lines) {
+  const pageWidth = 595;
+  const pageHeight = 842;
+  const startX = 40;
+  const startY = 800;
+  const bottomMargin = 40;
+  const lineHeight = 13;
+  const maxLinesPerPage = Math.max(1, Math.floor((startY - bottomMargin) / lineHeight));
+
+  const normalizedLines = Array.isArray(lines) && lines.length ? lines : ['Quotation'];
+  const pages = [];
+  for (let i = 0; i < normalizedLines.length; i += maxLinesPerPage) {
+    pages.push(normalizedLines.slice(i, i + maxLinesPerPage));
+  }
+
+  const objects = [];
+  const addObject = (content) => {
+    objects.push(content);
+    return objects.length;
+  };
+
+  const fontObjectId = addObject('<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica >>');
+  const pageObjectIds = [];
+
+  pages.forEach((pageLines) => {
+    const operations = ['BT', '/F1 10 Tf', `1 0 0 1 ${startX} ${startY} Tm`];
+
+    pageLines.forEach((line, idx) => {
+      operations.push(`(${escapePdfText(line)}) Tj`);
+      if (idx < pageLines.length - 1) {
+        operations.push(`0 -${lineHeight} Td`);
+      }
+    });
+
+    operations.push('ET');
+    const stream = operations.join('\n');
+    const contentObjectId = addObject(
+      `<< /Length ${Buffer.byteLength(stream, 'utf8')} >>\nstream\n${stream}\nendstream`
+    );
+
+    const pageObjectId = addObject(
+      `<< /Type /Page /Parent __PAGES_OBJECT__ 0 R /MediaBox [0 0 ${pageWidth} ${pageHeight}] ` +
+      `/Resources << /Font << /F1 ${fontObjectId} 0 R >> >> /Contents ${contentObjectId} 0 R >>`
+    );
+    pageObjectIds.push(pageObjectId);
+  });
+
+  const pagesObjectId = addObject(
+    `<< /Type /Pages /Kids [${pageObjectIds.map((id) => `${id} 0 R`).join(' ')}] /Count ${pageObjectIds.length} >>`
+  );
+
+  pageObjectIds.forEach((id) => {
+    objects[id - 1] = objects[id - 1].replace('__PAGES_OBJECT__', String(pagesObjectId));
+  });
+
+  const catalogObjectId = addObject(`<< /Type /Catalog /Pages ${pagesObjectId} 0 R >>`);
+
+  let pdf = '%PDF-1.4\n%1234\n';
+  const offsets = [0];
+  objects.forEach((objectContent, idx) => {
+    offsets.push(Buffer.byteLength(pdf, 'utf8'));
+    pdf += `${idx + 1} 0 obj\n${objectContent}\nendobj\n`;
+  });
+
+  const xrefOffset = Buffer.byteLength(pdf, 'utf8');
+  let xref = `xref\n0 ${objects.length + 1}\n0000000000 65535 f \n`;
+  offsets.slice(1).forEach((offset) => {
+    xref += `${String(offset).padStart(10, '0')} 00000 n \n`;
+  });
+
+  pdf += `${xref}trailer\n<< /Size ${objects.length + 1} /Root ${catalogObjectId} 0 R >>\n`;
+  pdf += `startxref\n${xrefOffset}\n%%EOF\n`;
+
+  return Buffer.from(pdf, 'utf8');
+}
+
+function isPdfkitFontDataError(error) {
+  const message = String(error && error.message ? error.message : error);
+  return message.includes('Helvetica.afm') || (message.includes('/pdfkit/') && message.includes('/data/'));
+}
+
+function generatePdfKitBuffer({ quote, items, proposalItems, quoteId }) {
+  return new Promise((resolve, reject) => {
+    const doc = new PDFDocument({ margin: 40, size: 'A4' });
+    const chunks = [];
+
+    doc.on('data', (chunk) => chunks.push(chunk));
+    doc.on('end', () => resolve(Buffer.concat(chunks)));
+    doc.on('error', reject);
+
+    try {
+      const logoPath = path.join(__dirname, 'public', 'logo.png');
+      if (fs.existsSync(logoPath)) {
+        doc.image(logoPath, 40, 40, { width: 120 });
+      }
+
+      doc
+        .fontSize(18)
+        .text(company.name, 180, 45)
+        .fontSize(10)
+        .text(company.tagline || '', 180, 65)
+        .text(company.address || '', 180, 80)
+        .text(`Phone: ${company.phone || ''}`, 180, 95)
+        .text(`Email: ${company.email || ''}`, 180, 110)
+        .text(`GSTIN: ${company.gstin || ''}`, 180, 125);
+
+      doc.moveDown(2);
+      doc
+        .fontSize(16)
+        .text('Quotation', { align: 'right' })
+        .fontSize(10)
+        .text(`Quote No: ${quote.quote_no || `quote-${quoteId}`}`, { align: 'right' })
+        .text(`Date: ${formatDate(quote.quote_date)}`, { align: 'right' });
+
+      doc.moveDown();
+      doc
+        .fontSize(11)
+        .text(`Customer: ${quote.customer_name}`)
+        .text(`Phone: ${quote.customer_phone || '-'}`)
+        .text(`Email: ${quote.customer_email || '-'}`)
+        .text(`GSTIN: ${quote.customer_gstin || '-'}`)
+        .text(`Address: ${quote.customer_address || '-'}`);
+
+      doc.moveDown();
+
+      const tableTop = doc.y + 10;
+      const itemStartY = tableTop + 20;
+
+      const col = {
+        no: 40,
+        name: 70,
+        hsn: 240,
+        qty: 300,
+        rate: 340,
+        gst: 400,
+        total: 470
+      };
+
+      doc
+        .fontSize(9)
+        .text('No', col.no, tableTop)
+        .text('Item', col.name, tableTop)
+        .text('HSN', col.hsn, tableTop)
+        .text('Qty', col.qty, tableTop)
+        .text('Rate', col.rate, tableTop)
+        .text('GST%', col.gst, tableTop)
+        .text('Total', col.total, tableTop, { align: 'right', width: 80 });
+
+      doc.moveTo(40, tableTop + 12).lineTo(555, tableTop + 12).stroke();
+
+      let y = itemStartY;
+      items.forEach((item, index) => {
+        if (y > 700) {
+          doc.addPage();
+          y = 60;
+        }
+
+        const qty = Number(item.qty || 0);
+        const unitPrice = Number(item.unit_price || 0);
+        const gstRate = Number(item.gst_rate || 0);
+        const lineTotal = Number(item.total || 0);
+
+        doc
+          .fontSize(9)
+          .text(String(index + 1), col.no, y)
+          .text(item.name, col.name, y, { width: 160 })
+          .text(item.hsn || '-', col.hsn, y)
+          .text(String(qty), col.qty, y)
+          .text(unitPrice.toFixed(2), col.rate, y)
+          .text(gstRate.toFixed(2), col.gst, y)
+          .text(lineTotal.toFixed(2), col.total, y, { align: 'right', width: 80 });
+
+        y += 20;
+      });
+
+      doc
+        .fontSize(10)
+        .text(`Subtotal: ${Number(quote.subtotal).toFixed(2)}`, 350, y + 10, { align: 'right', width: 200 })
+        .text(`CGST: ${Number(quote.cgst_total).toFixed(2)}`, 350, y + 25, { align: 'right', width: 200 })
+        .text(`SGST: ${Number(quote.sgst_total).toFixed(2)}`, 350, y + 40, { align: 'right', width: 200 })
+        .fontSize(12)
+        .text(`Grand Total: ${Number(quote.total).toFixed(2)}`, 350, y + 60, { align: 'right', width: 200 });
+
+      let sectionY = y + 100;
+
+      sectionY = drawTable(doc, {
+        title: 'ITEMS CONSIDERED FOR PROPOSAL',
+        startY: sectionY,
+        columns: [
+          { key: 'sr_no', label: 'Sr.no', width: 40, align: 'center' },
+          { key: 'description', label: 'Description', width: 170 },
+          { key: 'unit', label: 'Unit', width: 60, align: 'center' },
+          { key: 'qty', label: 'Qty.', width: 70, align: 'center' },
+          { key: 'specification', label: 'Specification', width: 85, align: 'center' },
+          { key: 'make', label: 'Make', width: 90, align: 'center' }
+        ],
+        rows: proposalItems
+      }) + 12;
+
+      const estimatedRows = estimatedOtherCharges.map((row) => ({
+        item: row.item,
+        remark: row.remark
+      }));
+
+      if (company.estimatedOtherChargesFooter) {
+        estimatedRows.push({
+          item: company.estimatedOtherChargesFooter,
+          remark: ''
+        });
+      }
+
+      sectionY = drawTable(doc, {
+        title: 'Estimated Other Charges',
+        startY: sectionY,
+        columns: [
+          { key: 'item', label: 'Particulars', width: 375, align: 'center' },
+          { key: 'remark', label: 'Status', width: 140, align: 'center' }
+        ],
+        rows: estimatedRows
+      }) + 12;
+
+      if (customerScopeRows.length) {
+        sectionY = drawTable(doc, {
+          title: 'Scope Of Work',
+          startY: sectionY,
+          columns: [
+            { key: 'sr_no', label: 'Sr.no', width: 45, align: 'center' },
+            { key: 'description', label: 'Description', width: 280 },
+            { key: 'remark', label: 'Customer Scope', width: 190, align: 'center' }
+          ],
+          rows: customerScopeRows
+        }) + 12;
+      }
+
+      sectionY = drawTable(doc, {
+        title: 'Terms & Conditions',
+        startY: sectionY,
+        columns: [
+          { key: 'sr_no', label: 'Sr.no', width: 45, align: 'center' },
+          { key: 'parameter', label: 'Parameters', width: 240 },
+          { key: 'remark', label: 'Remarks', width: 230, align: 'center' }
+        ],
+        rows: termsConditions
+      }) + 12;
+
+      sectionY = drawTable(doc, {
+        title: 'Warrantee',
+        startY: sectionY,
+        columns: [
+          { key: 'sr_no', label: 'Sr.no', width: 45, align: 'center' },
+          { key: 'parameter', label: 'Parameters', width: 240 },
+          { key: 'remark', label: 'Remarks', width: 230, align: 'center' }
+        ],
+        rows: warrantyRows,
+        keepTogether: true
+      }) + 10;
+
+      if (quote.notes) {
+        if (sectionY > doc.page.height - 100) {
+          doc.addPage();
+          sectionY = doc.page.margins.top;
+        }
+        doc.font('Helvetica-Bold').fontSize(10).text('Additional Note:', 40, sectionY);
+        doc.font('Helvetica').fontSize(10).text(quote.notes, 40, sectionY + 14, { width: 515 });
+      }
+
+      doc.end();
+    } catch (error) {
+      reject(error);
+    }
+  });
+}
+
 app.get('/', asyncHandler(async (req, res) => {
   const [products] = await pool.query('SELECT * FROM products ORDER BY name');
   res.render('quote_new', {
@@ -801,191 +1210,28 @@ app.get('/quotes/:id/pdf', asyncHandler(async (req, res) => {
   }
 
   const proposalItems = parseProposalItems(quote.proposal_items_json);
-
-  const doc = new PDFDocument({ margin: 40, size: 'A4' });
   const fileName = `${quote.quote_no || `quote-${id}`}.pdf`;
+  let pdfBuffer;
+  let pdfEngine = 'pdfkit';
+
+  try {
+    pdfBuffer = await generatePdfKitBuffer({ quote, items, proposalItems, quoteId: id });
+  } catch (error) {
+    if (!isPdfkitFontDataError(error)) {
+      throw error;
+    }
+
+    console.warn('PDFKit font data missing, using basic PDF fallback:', error.message);
+    pdfEngine = 'basic-fallback';
+    pdfBuffer = createSimplePdfBuffer(
+      buildFallbackPdfLines({ quote, items, proposalItems })
+    );
+  }
 
   res.setHeader('Content-Type', 'application/pdf');
   res.setHeader('Content-Disposition', `attachment; filename="${fileName}"`);
-
-  doc.pipe(res);
-
-  const logoPath = path.join(__dirname, 'public', 'logo.png');
-  if (fs.existsSync(logoPath)) {
-    doc.image(logoPath, 40, 40, { width: 120 });
-  }
-
-  doc
-    .fontSize(18)
-    .text(company.name, 180, 45)
-    .fontSize(10)
-    .text(company.tagline || '', 180, 65)
-    .text(company.address || '', 180, 80)
-    .text(`Phone: ${company.phone || ''}`, 180, 95)
-    .text(`Email: ${company.email || ''}`, 180, 110)
-    .text(`GSTIN: ${company.gstin || ''}`, 180, 125);
-
-  doc.moveDown(2);
-  doc
-    .fontSize(16)
-    .text('Quotation', { align: 'right' })
-    .fontSize(10)
-    .text(`Quote No: ${quote.quote_no}`, { align: 'right' })
-    .text(`Date: ${formatDate(quote.quote_date)}`, { align: 'right' });
-
-  doc.moveDown();
-  doc
-    .fontSize(11)
-    .text(`Customer: ${quote.customer_name}`)
-    .text(`Phone: ${quote.customer_phone || '-'}`)
-    .text(`Email: ${quote.customer_email || '-'}`)
-    .text(`GSTIN: ${quote.customer_gstin || '-'}`)
-    .text(`Address: ${quote.customer_address || '-'}`);
-
-  doc.moveDown();
-
-  const tableTop = doc.y + 10;
-  const itemStartY = tableTop + 20;
-
-  const col = {
-    no: 40,
-    name: 70,
-    hsn: 240,
-    qty: 300,
-    rate: 340,
-    gst: 400,
-    total: 470
-  };
-
-  doc
-    .fontSize(9)
-    .text('No', col.no, tableTop)
-    .text('Item', col.name, tableTop)
-    .text('HSN', col.hsn, tableTop)
-    .text('Qty', col.qty, tableTop)
-    .text('Rate', col.rate, tableTop)
-    .text('GST%', col.gst, tableTop)
-    .text('Total', col.total, tableTop, { align: 'right', width: 80 });
-
-  doc.moveTo(40, tableTop + 12).lineTo(555, tableTop + 12).stroke();
-
-  let y = itemStartY;
-  items.forEach((item, index) => {
-    if (y > 700) {
-      doc.addPage();
-      y = 60;
-    }
-
-    const qty = Number(item.qty || 0);
-    const unitPrice = Number(item.unit_price || 0);
-    const gstRate = Number(item.gst_rate || 0);
-    const lineTotal = Number(item.total || 0);
-
-    doc
-      .fontSize(9)
-      .text(String(index + 1), col.no, y)
-      .text(item.name, col.name, y, { width: 160 })
-      .text(item.hsn || '-', col.hsn, y)
-      .text(String(qty), col.qty, y)
-      .text(unitPrice.toFixed(2), col.rate, y)
-      .text(gstRate.toFixed(2), col.gst, y)
-      .text(lineTotal.toFixed(2), col.total, y, { align: 'right', width: 80 });
-
-    y += 20;
-  });
-
-  doc
-    .fontSize(10)
-    .text(`Subtotal: ${Number(quote.subtotal).toFixed(2)}`, 350, y + 10, { align: 'right', width: 200 })
-    .text(`CGST: ${Number(quote.cgst_total).toFixed(2)}`, 350, y + 25, { align: 'right', width: 200 })
-    .text(`SGST: ${Number(quote.sgst_total).toFixed(2)}`, 350, y + 40, { align: 'right', width: 200 })
-    .fontSize(12)
-    .text(`Grand Total: ${Number(quote.total).toFixed(2)}`, 350, y + 60, { align: 'right', width: 200 });
-
-  let sectionY = y + 100;
-
-  sectionY = drawTable(doc, {
-    title: 'ITEMS CONSIDERED FOR PROPOSAL',
-    startY: sectionY,
-    columns: [
-      { key: 'sr_no', label: 'Sr.no', width: 40, align: 'center' },
-      { key: 'description', label: 'Description', width: 170 },
-      { key: 'unit', label: 'Unit', width: 60, align: 'center' },
-      { key: 'qty', label: 'Qty.', width: 70, align: 'center' },
-      { key: 'specification', label: 'Specification', width: 85, align: 'center' },
-      { key: 'make', label: 'Make', width: 90, align: 'center' }
-    ],
-    rows: proposalItems
-  }) + 12;
-
-  const estimatedRows = estimatedOtherCharges.map((row) => ({
-    item: row.item,
-    remark: row.remark
-  }));
-
-  if (company.estimatedOtherChargesFooter) {
-    estimatedRows.push({
-      item: company.estimatedOtherChargesFooter,
-      remark: ''
-    });
-  }
-
-  sectionY = drawTable(doc, {
-    title: 'Estimated Other Charges',
-    startY: sectionY,
-    columns: [
-      { key: 'item', label: 'Particulars', width: 375, align: 'center' },
-      { key: 'remark', label: 'Status', width: 140, align: 'center' }
-    ],
-    rows: estimatedRows
-  }) + 12;
-
-  if (customerScopeRows.length) {
-    sectionY = drawTable(doc, {
-      title: 'Scope Of Work',
-      startY: sectionY,
-      columns: [
-        { key: 'sr_no', label: 'Sr.no', width: 45, align: 'center' },
-        { key: 'description', label: 'Description', width: 280 },
-        { key: 'remark', label: 'Customer Scope', width: 190, align: 'center' }
-      ],
-      rows: customerScopeRows
-    }) + 12;
-  }
-
-  sectionY = drawTable(doc, {
-    title: 'Terms & Conditions',
-    startY: sectionY,
-    columns: [
-      { key: 'sr_no', label: 'Sr.no', width: 45, align: 'center' },
-      { key: 'parameter', label: 'Parameters', width: 240 },
-      { key: 'remark', label: 'Remarks', width: 230, align: 'center' }
-    ],
-    rows: termsConditions
-  }) + 12;
-
-  sectionY = drawTable(doc, {
-    title: 'Warrantee',
-    startY: sectionY,
-    columns: [
-      { key: 'sr_no', label: 'Sr.no', width: 45, align: 'center' },
-      { key: 'parameter', label: 'Parameters', width: 240 },
-      { key: 'remark', label: 'Remarks', width: 230, align: 'center' }
-    ],
-    rows: warrantyRows,
-    keepTogether: true
-  }) + 10;
-
-  if (quote.notes) {
-    if (sectionY > doc.page.height - 100) {
-      doc.addPage();
-      sectionY = doc.page.margins.top;
-    }
-    doc.font('Helvetica-Bold').fontSize(10).text('Additional Note:', 40, sectionY);
-    doc.font('Helvetica').fontSize(10).text(quote.notes, 40, sectionY + 14, { width: 515 });
-  }
-
-  doc.end();
+  res.setHeader('X-PDF-Engine', pdfEngine);
+  res.send(pdfBuffer);
 }));
 
 app.use((error, req, res, next) => {
