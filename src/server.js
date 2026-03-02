@@ -20,8 +20,8 @@ function withBase(pathname) {
 
 app.use((req, res, next) => {
   res.locals.basePath = normalizedBasePath;
-  res.locals.assetVersion = '20260302-3';
-  res.setHeader('X-NewBharat-Build', '20260302-3');
+  res.locals.assetVersion = '20260302-4';
+  res.setHeader('X-NewBharat-Build', '20260302-4');
 
   if (!normalizedBasePath) {
     return next();
@@ -153,14 +153,28 @@ function text(value) {
   return String(value);
 }
 
+function normalizeProposalCellValue(value) {
+  const raw = text(value).trim();
+  if (!raw.includes(',')) {
+    return raw;
+  }
+
+  const parts = raw.split(',').map((part) => part.trim()).filter((part) => part.length);
+  if (parts.length > 1 && parts.every((part) => part === parts[0])) {
+    return parts[0];
+  }
+
+  return raw;
+}
+
 function normalizeProposalTemplateRow(row, index) {
   return {
-    sr_no: text(row.sr_no || index + 1),
-    description: text(row.description),
-    unit: text(row.unit),
-    specification: text(row.specification),
-    qty: text(row.qty),
-    make: text(row.make)
+    sr_no: normalizeProposalCellValue(row.sr_no || index + 1),
+    description: normalizeProposalCellValue(row.description),
+    unit: normalizeProposalCellValue(row.unit),
+    specification: normalizeProposalCellValue(row.specification),
+    qty: normalizeProposalCellValue(row.qty),
+    make: normalizeProposalCellValue(row.make)
   };
 }
 
@@ -208,17 +222,17 @@ function readProposalField({ row, rowKeys, formBody, formKeys, fallback }) {
   if (isObject(formBody)) {
     for (const key of formKeys) {
       if (hasOwn(formBody, key)) {
-        return text(formBody[key]);
+        return normalizeProposalCellValue(firstValue(formBody[key]));
       }
     }
   }
 
   const rowResult = readFieldFromObject(row, rowKeys);
   if (rowResult.found) {
-    return text(rowResult.value);
+    return normalizeProposalCellValue(rowResult.value);
   }
 
-  return text(fallback);
+  return normalizeProposalCellValue(fallback);
 }
 
 function normalizeProposalRowByIndex({ row, idx, defaults, formBody }) {
