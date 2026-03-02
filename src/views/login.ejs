@@ -1,0 +1,38 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title><%= title || 'Sign In' %> | <%= company.name %></title>
+  <link rel="stylesheet" href="<%= basePath %>/public/styles.css?v=<%= assetVersion %>" />
+</head>
+<body class="auth-page">
+  <main class="auth-shell">
+    <section class="card auth-card">
+      <img class="auth-logo" src="<%= basePath %>/public/logo.png" alt="<%= company.name %>" />
+      <h1>Sign In</h1>
+      <p class="auth-subtitle">Use your fixed username and password to continue.</p>
+
+      <% if (error) { %>
+        <p class="auth-error"><%= error %></p>
+      <% } %>
+
+      <form class="auth-form" method="POST" action="<%= basePath %>/login">
+        <input type="hidden" name="next" value="<%= nextPath || '/' %>" />
+
+        <label>
+          Username
+          <input type="text" name="username" autocomplete="username" required />
+        </label>
+
+        <label>
+          Password
+          <input type="password" name="password" autocomplete="current-password" required />
+        </label>
+
+        <button type="submit" class="btn-primary auth-submit">Sign In</button>
+      </form>
+    </section>
+  </main>
+</body>
+</html>

@@ -15,6 +15,9 @@
       <a href="<%= basePath %>/">New Quote</a>
       <a href="<%= basePath %>/products">Products</a>
       <a href="<%= basePath %>/quotes">Quotes</a>
+      <% if (authUser) { %>
+        <a href="<%= basePath %>/logout">Logout</a>
+      <% } %>
     </nav>
   </header>
   <main class="container">

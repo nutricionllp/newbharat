@@ -1,5 +1,6 @@
 const path = require('path');
 const fs = require('fs');
+const crypto = require('crypto');
 const express = require('express');
 const dotenv = require('dotenv');
 const PDFDocument = require('pdfkit');
@@ -20,8 +21,9 @@ function withBase(pathname) {
 
 app.use((req, res, next) => {
   res.locals.basePath = normalizedBasePath;
-  res.locals.assetVersion = '20260303-2';
-  res.setHeader('X-NewBharat-Build', '20260303-2');
+  res.locals.assetVersion = '20260303-3';
+  res.locals.authUser = null;
+  res.setHeader('X-NewBharat-Build', '20260303-3');
 
   if (!normalizedBasePath) {
     return next();
@@ -123,6 +125,13 @@ const estimatedOtherCharges = Array.isArray(company.estimatedOtherCharges) ? com
 const customerScopeRows = Array.isArray(company.customerScope) ? company.customerScope : [];
 const termsConditions = Array.isArray(company.termsConditions) ? company.termsConditions : [];
 const warrantyRows = Array.isArray(company.warranty) ? company.warranty : [];
+const authConfig = {
+  username: process.env.APP_LOGIN_USERNAME || 'HelloBharat',
+  password: process.env.APP_LOGIN_PASSWORD || 'Hello@0109',
+  secret: process.env.AUTH_SECRET || 'new-bharat-auth-secret-change-this',
+  cookieName: 'nb_auth',
+  cookieMaxAgeSeconds: 60 * 60 * 12
+};
 
 app.set('view engine', 'ejs');
 app.set('views', path.join(__dirname, 'views'));
@@ -135,6 +144,126 @@ function asyncHandler(fn) {
   return (req, res, next) => {
     Promise.resolve(fn(req, res, next)).catch(next);
   };
+}
+
+function parseCookies(cookieHeader) {
+  const out = {};
+  if (!cookieHeader) {
+    return out;
+  }
+
+  cookieHeader.split(';').forEach((part) => {
+    const [rawKey, ...rawValueParts] = part.trim().split('=');
+    if (!rawKey) {
+      return;
+    }
+
+    const rawValue = rawValueParts.join('=');
+    out[rawKey] = decodeURIComponent(rawValue || '');
+  });
+
+  return out;
+}
+
+function signAuthData(data) {
+  return crypto
+    .createHmac('sha256', authConfig.secret)
+    .update(data)
+    .digest('hex');
+}
+
+function createAuthToken(username) {
+  const expiresAt = Date.now() + (authConfig.cookieMaxAgeSeconds * 1000);
+  const data = `${username}|${expiresAt}`;
+  const encoded = Buffer.from(data, 'utf8').toString('base64url');
+  const signature = signAuthData(data);
+  return `${encoded}.${signature}`;
+}
+
+function verifyAuthToken(token) {
+  if (!token || typeof token !== 'string' || !token.includes('.')) {
+    return null;
+  }
+
+  const [encoded, signature] = token.split('.', 2);
+  if (!encoded || !signature) {
+    return null;
+  }
+
+  let data = '';
+  try {
+    data = Buffer.from(encoded, 'base64url').toString('utf8');
+  } catch (error) {
+    return null;
+  }
+
+  const expectedSignature = signAuthData(data);
+  const signatureBuffer = Buffer.from(signature);
+  const expectedBuffer = Buffer.from(expectedSignature);
+  if (signatureBuffer.length !== expectedBuffer.length) {
+    return null;
+  }
+  if (!crypto.timingSafeEqual(signatureBuffer, expectedBuffer)) {
+    return null;
+  }
+
+  const [username, expiresAtRaw] = data.split('|');
+  const expiresAt = Number(expiresAtRaw);
+  if (!username || !Number.isFinite(expiresAt) || Date.now() > expiresAt) {
+    return null;
+  }
+
+  if (username !== authConfig.username) {
+    return null;
+  }
+
+  return username;
+}
+
+function serializeCookie(name, value, { path: cookiePath, maxAgeSeconds, secure = false }) {
+  const parts = [
+    `${name}=${encodeURIComponent(value)}`,
+    `Path=${cookiePath || '/'}`,
+    'HttpOnly',
+    'SameSite=Lax'
+  ];
+
+  if (Number.isFinite(maxAgeSeconds)) {
+    parts.push(`Max-Age=${Math.max(0, Math.floor(maxAgeSeconds))}`);
+  }
+  if (secure) {
+    parts.push('Secure');
+  }
+
+  return parts.join('; ');
+}
+
+function setAuthCookie(res, token) {
+  const cookiePath = normalizedBasePath || '/';
+  const secureCookie = process.env.AUTH_COOKIE_SECURE === 'true';
+  res.setHeader('Set-Cookie', serializeCookie(authConfig.cookieName, token, {
+    path: cookiePath,
+    maxAgeSeconds: authConfig.cookieMaxAgeSeconds,
+    secure: secureCookie
+  }));
+}
+
+function clearAuthCookie(res) {
+  const cookiePath = normalizedBasePath || '/';
+  const secureCookie = process.env.AUTH_COOKIE_SECURE === 'true';
+  res.setHeader('Set-Cookie', serializeCookie(authConfig.cookieName, '', {
+    path: cookiePath,
+    maxAgeSeconds: 0,
+    secure: secureCookie
+  }));
+}
+
+function getSafeNextPath(nextValue) {
+  const candidate = text(nextValue).trim();
+  if (!candidate || !candidate.startsWith('/') || candidate.startsWith('//') || candidate.startsWith('/login')) {
+    return '/';
+  }
+  return candidate;
 }
 
 function round2(value) {
@@ -1181,6 +1310,63 @@ function generatePdfKitBuffer({ quote, items, proposalItems, quoteId }) {
     }
   });
 }
+
+app.get('/login', (req, res) => {
+  const cookies = parseCookies(req.headers.cookie || '');
+  const currentUser = verifyAuthToken(cookies[authConfig.cookieName]);
+  const nextPath = getSafeNextPath(req.query.next);
+
+  if (currentUser) {
+    return res.redirect(withBase(nextPath));
+  }
+
+  return res.render('login', {
+    company,
+    title: 'Sign In',
+    nextPath,
+    error: ''
+  });
+});
+
+app.post('/login', (req, res) => {
+  const username = text(req.body.username).trim();
+  const password = text(req.body.password);
+  const nextPath = getSafeNextPath(req.body.next);
+
+  if (username !== authConfig.username || password !== authConfig.password) {
+    return res.status(401).render('login', {
+      company,
+      title: 'Sign In',
+      nextPath,
+      error: 'Invalid username or password.'
+    });
+  }
+
+  const token = createAuthToken(username);
+  setAuthCookie(res, token);
+  return res.redirect(withBase(nextPath));
+});
+
+app.get('/logout', (req, res) => {
+  clearAuthCookie(res);
+  res.redirect(withBase('/login'));
+});
+
+app.use((req, res, next) => {
+  if (req.path === '/login' || req.path === '/logout') {
+    return next();
+  }
+
+  const cookies = parseCookies(req.headers.cookie || '');
+  const authUser = verifyAuthToken(cookies[authConfig.cookieName]);
+  if (!authUser) {
+    const nextPath = getSafeNextPath(req.url || '/');
+    return res.redirect(withBase(`/login?next=${encodeURIComponent(nextPath)}`));
+  }
+
+  res.locals.authUser = authUser;
+  return next();
+});
 
 app.get('/', asyncHandler(async (req, res) => {
   const [products] = await pool.query('SELECT * FROM products ORDER BY name');
