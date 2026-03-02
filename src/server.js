@@ -20,8 +20,8 @@ function withBase(pathname) {
 
 app.use((req, res, next) => {
   res.locals.basePath = normalizedBasePath;
-  res.locals.assetVersion = '20260303-1';
-  res.setHeader('X-NewBharat-Build', '20260303-1');
+  res.locals.assetVersion = '20260303-2';
+  res.setHeader('X-NewBharat-Build', '20260303-2');
 
   if (!normalizedBasePath) {
     return next();
@@ -940,11 +940,14 @@ function getCompanyStampPath() {
 }
 
 function drawSignatorySection(doc, startY) {
-  const sectionHeight = 150;
+  const sectionHeight = 178;
   let y = startY;
   const pageBottom = doc.page.height - doc.page.margins.bottom;
   const sectionX = 330;
   const sectionWidth = 220;
+  const sectionCenterX = sectionX + (sectionWidth / 2);
+  const stampWidth = 130;
+  const stampHeight = 96;
 
   if (y + sectionHeight > pageBottom) {
     doc.addPage();
@@ -952,26 +955,30 @@ function drawSignatorySection(doc, startY) {
   }
 
   doc.font('Helvetica-Bold').fontSize(11).text(`FOR, ${company.name || 'New Bharat Enterprise'}`, sectionX, y, {
-    width: sectionWidth
+    width: sectionWidth,
+    align: 'center'
   });
 
   const stampPath = getCompanyStampPath();
-  const stampY = y + 18;
+  const stampY = y + 20;
+  const stampX = Math.round(sectionCenterX - (stampWidth / 2));
+  const stampCaptionY = stampY + stampHeight + 6;
+  const signatoryY = stampCaptionY + 24;
 
   if (stampPath) {
-    doc.image(stampPath, sectionX + 40, stampY, { fit: [130, 96], align: 'center', valign: 'center' });
-    doc.font('Helvetica').fontSize(10).text('(Stamp of Company)', sectionX, stampY + 100, {
+    doc.image(stampPath, stampX, stampY, { fit: [stampWidth, stampHeight], align: 'center', valign: 'center' });
+    doc.font('Helvetica').fontSize(10).text('(Stamp of Company)', sectionX, stampCaptionY, {
       width: sectionWidth,
       align: 'center'
     });
   } else {
-    doc.font('Helvetica').fontSize(10).text('(Stamp of Company)', sectionX, stampY + 42, {
+    doc.font('Helvetica').fontSize(10).text('(Stamp of Company)', sectionX, y + 72, {
       width: sectionWidth,
       align: 'center'
     });
   }
 
-  doc.font('Helvetica').fontSize(11).text('Signatory Authorized', sectionX, y + 132, {
+  doc.font('Helvetica').fontSize(11).text('Signatory Authorized', sectionX, signatoryY, {
     width: sectionWidth,
     align: 'center'
   });
