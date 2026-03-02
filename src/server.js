@@ -20,7 +20,8 @@ function withBase(pathname) {
 
 app.use((req, res, next) => {
   res.locals.basePath = normalizedBasePath;
-  res.locals.assetVersion = '20260302-1';
+  res.locals.assetVersion = '20260302-2';
+  res.setHeader('X-NewBharat-Build', '20260302-2');
 
   if (!normalizedBasePath) {
     return next();
