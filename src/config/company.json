@@ -5,26 +5,12 @@
   "phone": "+91-99788 62711",
   "email": "Newbharat.gujarat@gmail.com",
   "gstin": "24AAYFN8774C1ZO",
-  "bankAccounts": [
-    {
-      "key": "hdfc",
-      "label": "HDFC Bank",
-      "holderName": "NEW BHARAT ENTERPRISE",
-      "accountNumber": "5020 0116 9528 97",
-      "bankName": "HDFC Bank",
-      "ifsc": "HDFC0007621",
-      "branch": "TOWN HALL ROAD KADI"
-    },
-    {
-      "key": "pnb",
-      "label": "Punjab National Bank",
-      "holderName": "New Bharat Enterprise",
-      "accountNumber": "027600 2100 118 659",
-      "bankName": "Punjab National Bank",
-      "ifsc": "PUNB0027600",
-      "branch": ""
-    }
-  ],
+  "bank": {
+    "accountName": "New Bharat Enterprise",
+    "accountNo": "XXXXXXXXXXXX",
+    "ifsc": "XXXXXXXXXXX",
+    "bankName": "Your Bank"
+  },
   "proposalTemplate": [
     {
       "sr_no": 1,

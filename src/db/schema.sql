@@ -18,7 +18,6 @@ CREATE TABLE IF NOT EXISTS quotes (
   customer_email VARCHAR(120) NULL,
   customer_address TEXT NULL,
   customer_gstin VARCHAR(50) NULL,
-  selected_bank_key VARCHAR(100) NULL,
   proposal_items_json LONGTEXT NULL,
   subtotal DECIMAL(12,2) NOT NULL DEFAULT 0,
   cgst_total DECIMAL(12,2) NOT NULL DEFAULT 0,

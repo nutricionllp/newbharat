@@ -21,9 +21,9 @@ function withBase(pathname) {
 
 app.use((req, res, next) => {
   res.locals.basePath = normalizedBasePath;
-  res.locals.assetVersion = '20260426-1';
+  res.locals.assetVersion = '20260303-3';
   res.locals.authUser = null;
-  res.setHeader('X-NewBharat-Build', '20260426-1');
+  res.setHeader('X-NewBharat-Build', '20260303-3');
 
   if (!normalizedBasePath) {
     return next();
@@ -125,7 +125,6 @@ const estimatedOtherCharges = Array.isArray(company.estimatedOtherCharges) ? com
 const customerScopeRows = Array.isArray(company.customerScope) ? company.customerScope : [];
 const termsConditions = Array.isArray(company.termsConditions) ? company.termsConditions : [];
 const warrantyRows = Array.isArray(company.warranty) ? company.warranty : [];
-const bankAccounts = Array.isArray(company.bankAccounts) ? company.bankAccounts : [];
 const authConfig = {
   username: text(process.env.APP_LOGIN_USERNAME).trim(),
   password: text(process.env.APP_LOGIN_PASSWORD),
@@ -269,32 +268,6 @@ function getSafeNextPath(nextValue) {
     return '/';
   }
   return candidate;
-}
-
-function normalizeBankAccount(bank, index) {
-  return {
-    key: text(bank.key || `bank-${index + 1}`).trim(),
-    label: text(bank.label || bank.bankName || `Bank ${index + 1}`).trim(),
-    holderName: text(bank.holderName || bank.accountName).trim(),
-    accountNumber: text(bank.accountNumber || bank.accountNo).trim(),
-    bankName: text(bank.bankName).trim(),
-    ifsc: text(bank.ifsc).trim(),
-    branch: text(bank.branch).trim()
-  };
-}
-
-function getConfiguredBankAccounts() {
-  return bankAccounts.map(normalizeBankAccount).filter((bank) => bank.key);
-}
-
-function getSelectedBank(bankKey) {
-  const configuredBanks = getConfiguredBankAccounts();
-  if (!configuredBanks.length) {
-    return null;
-  }
-
-  const requestedKey = text(bankKey).trim();
-  return configuredBanks.find((bank) => bank.key === requestedKey) || configuredBanks[0];
 }
 
 function round2(value) {
@@ -580,21 +553,14 @@ async function ensureQuoteEnhancements() {
   }
 
   const [rows] = await pool.query(
-    `SELECT COLUMN_NAME
+    `SELECT COUNT(*) AS count
      FROM INFORMATION_SCHEMA.COLUMNS
-     WHERE TABLE_SCHEMA = ? AND TABLE_NAME = 'quotes'
-       AND COLUMN_NAME IN ('proposal_items_json', 'selected_bank_key')`,
+     WHERE TABLE_SCHEMA = ? AND TABLE_NAME = 'quotes' AND COLUMN_NAME = 'proposal_items_json'`,
     [dbName]
   );
 
-  const columns = new Set(rows.map((row) => row.COLUMN_NAME));
-
-  if (!columns.has('proposal_items_json')) {
+  if (!rows[0].count) {
     await pool.query('ALTER TABLE quotes ADD COLUMN proposal_items_json LONGTEXT NULL');
-  }
-
-  if (!columns.has('selected_bank_key')) {
-    await pool.query('ALTER TABLE quotes ADD COLUMN selected_bank_key VARCHAR(100) NULL');
   }
 }
 
@@ -603,17 +569,12 @@ async function saveQuote({ body, quoteId }) {
   const proposalItems = parseProposalItems(body.proposal_items_json || '[]', body);
   const proposalItemsJson = JSON.stringify(proposalItems);
   const { subtotal, cgstTotal, sgstTotal, total } = buildQuoteSummary(items);
-  const selectedBank = getSelectedBank(body.selected_bank_key);
-  const selectedBankKey = selectedBank ? selectedBank.key : null;
 
   const quoteDate = body.quote_date || new Date().toISOString().slice(0, 10);
   const customerName = String(body.customer_name || '').trim();
 
   if (!customerName) {
     throw new Error('Customer name is required.');
-  }
-  if (!selectedBankKey) {
-    throw new Error('Please select bank account details.');
   }
 
   const connection = await pool.getConnection();
@@ -626,8 +587,8 @@ async function saveQuote({ body, quoteId }) {
     if (!finalQuoteId) {
       const [insertResult] = await connection.query(
         `INSERT INTO quotes
-          (quote_no, quote_date, customer_name, customer_phone, customer_email, customer_address, customer_gstin, selected_bank_key, proposal_items_json, subtotal, cgst_total, sgst_total, total, notes)
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+          (quote_no, quote_date, customer_name, customer_phone, customer_email, customer_address, customer_gstin, proposal_items_json, subtotal, cgst_total, sgst_total, total, notes)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
         [
           null,
           quoteDate,
@@ -636,7 +597,6 @@ async function saveQuote({ body, quoteId }) {
           body.customer_email || null,
           body.customer_address || null,
           body.customer_gstin || null,
-          selectedBankKey,
           proposalItemsJson,
           subtotal,
           cgstTotal,
@@ -658,7 +618,7 @@ async function saveQuote({ body, quoteId }) {
       await connection.query(
         `UPDATE quotes
          SET quote_date = ?, customer_name = ?, customer_phone = ?, customer_email = ?, customer_address = ?, customer_gstin = ?,
-             selected_bank_key = ?, proposal_items_json = ?, subtotal = ?, cgst_total = ?, sgst_total = ?, total = ?, notes = ?
+             proposal_items_json = ?, subtotal = ?, cgst_total = ?, sgst_total = ?, total = ?, notes = ?
          WHERE id = ?`,
         [
           quoteDate,
@@ -667,7 +627,6 @@ async function saveQuote({ body, quoteId }) {
           body.customer_email || null,
           body.customer_address || null,
           body.customer_gstin || null,
-          selectedBankKey,
           proposalItemsJson,
           subtotal,
           cgstTotal,
@@ -925,7 +884,7 @@ function wrapPdfLine(line, maxChars = 110) {
   return out.length ? out : [''];
 }
 
-function buildFallbackPdfLines({ quote, items, proposalItems, selectedBank }) {
+function buildFallbackPdfLines({ quote, items, proposalItems }) {
   const lines = [];
 
   lines.push(company.name || 'Quotation');
@@ -1000,18 +959,6 @@ function buildFallbackPdfLines({ quote, items, proposalItems, selectedBank }) {
     warrantyRows.forEach((row) => {
       lines.push(`${row.sr_no || '-'} | ${row.parameter || '-'} | ${row.remark || '-'}`);
     });
-  }
-
-  if (selectedBank) {
-    lines.push('');
-    lines.push('BANK ACCOUNT DETAILS');
-    lines.push(`Account Holder: ${selectedBank.holderName || '-'}`);
-    lines.push(`Account Number: ${selectedBank.accountNumber || '-'}`);
-    lines.push(`Bank: ${selectedBank.bankName || selectedBank.label || '-'}`);
-    lines.push(`IFSC: ${selectedBank.ifsc || '-'}`);
-    if (selectedBank.branch) {
-      lines.push(`Branch: ${selectedBank.branch}`);
-    }
   }
 
   if (quote.notes) {
@@ -1172,55 +1119,7 @@ function drawSignatorySection(doc, startY) {
   return y + sectionHeight;
 }
 
-function drawBankDetailsSection(doc, startY, selectedBank) {
-  if (!selectedBank) {
-    return startY;
-  }
-
-  let y = startY;
-  const x = 40;
-  const width = 515;
-  const titleHeight = 24;
-  const rowHeight = 22;
-  const rows = [
-    ['Account Holder', selectedBank.holderName || '-'],
-    ['Account Number', selectedBank.accountNumber || '-'],
-    ['Bank', selectedBank.bankName || selectedBank.label || '-'],
-    ['IFSC', selectedBank.ifsc || '-']
-  ];
-
-  if (selectedBank.branch) {
-    rows.push(['Branch', selectedBank.branch]);
-  }
-
-  const estimatedHeight = titleHeight + (rows.length * rowHeight);
-  if (y + estimatedHeight > doc.page.height - doc.page.margins.bottom) {
-    doc.addPage();
-    y = doc.page.margins.top;
-  }
-
-  doc.save();
-  doc.rect(x, y, width, titleHeight).fill('#ececec');
-  doc.restore();
-  doc.rect(x, y, width, titleHeight).stroke();
-  doc.font('Helvetica-Bold').fontSize(12).text('Bank Account Details', x, y + 6, {
-    width,
-    align: 'center'
-  });
-  y += titleHeight;
-
-  rows.forEach(([label, value]) => {
-    doc.rect(x, y, 160, rowHeight).stroke();
-    doc.rect(x + 160, y, width - 160, rowHeight).stroke();
-    doc.font('Helvetica-Bold').fontSize(10).text(label, x + 6, y + 6, { width: 148 });
-    doc.font('Helvetica').fontSize(10).text(value, x + 166, y + 6, { width: width - 172 });
-    y += rowHeight;
-  });
-
-  return y;
-}
-
-function generatePdfKitBuffer({ quote, items, proposalItems, selectedBank, quoteId }) {
+function generatePdfKitBuffer({ quote, items, proposalItems, quoteId }) {
   return new Promise((resolve, reject) => {
     const doc = new PDFDocument({ margin: 40, size: 'A4' });
     const chunks = [];
@@ -1395,8 +1294,6 @@ function generatePdfKitBuffer({ quote, items, proposalItems, selectedBank, quote
         rows: warrantyRows,
         keepTogether: true
       }) + 10;
-
-      sectionY = drawBankDetailsSection(doc, sectionY, selectedBank) + 12;
 
       if (quote.notes) {
         if (sectionY > doc.page.height - 100) {
@@ -1604,13 +1501,12 @@ app.get('/quotes/:id/pdf', asyncHandler(async (req, res) => {
   }
 
   const proposalItems = parseProposalItems(quote.proposal_items_json);
-  const selectedBank = getSelectedBank(quote.selected_bank_key);
   const fileName = `${quote.quote_no || `quote-${id}`}.pdf`;
   let pdfBuffer;
   let pdfEngine = 'pdfkit';
 
   try {
-    pdfBuffer = await generatePdfKitBuffer({ quote, items, proposalItems, selectedBank, quoteId: id });
+    pdfBuffer = await generatePdfKitBuffer({ quote, items, proposalItems, quoteId: id });
   } catch (error) {
     if (!isPdfkitFontDataError(error)) {
       throw error;
@@ -1619,7 +1515,7 @@ app.get('/quotes/:id/pdf', asyncHandler(async (req, res) => {
     console.warn('PDFKit font data missing, using basic PDF fallback:', error.message);
     pdfEngine = 'basic-fallback';
     pdfBuffer = createSimplePdfBuffer(
-      buildFallbackPdfLines({ quote, items, proposalItems, selectedBank })
+      buildFallbackPdfLines({ quote, items, proposalItems })
     );
   }
 
