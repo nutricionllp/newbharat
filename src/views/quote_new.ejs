@@ -28,6 +28,16 @@
         GSTIN
         <input type="text" name="customer_gstin" value="<%= quote?.customer_gstin || '' %>" placeholder="Customer GSTIN" />
       </label>
+      <label>
+        Bank Account Details
+        <select name="selected_bank_key" required>
+          <% const availableBanks = (company && Array.isArray(company.bankAccounts)) ? company.bankAccounts : []; %>
+          <% const selectedBankKey = quote?.selected_bank_key || (availableBanks[0] && availableBanks[0].key) || ''; %>
+          <% availableBanks.forEach((bank) => { %>
+            <option value="<%= bank.key %>" <%= selectedBankKey === bank.key ? 'selected' : '' %>><%= bank.label %></option>
+          <% }) %>
+        </select>
+      </label>
     </div>
 
     <h2>Items</h2>
