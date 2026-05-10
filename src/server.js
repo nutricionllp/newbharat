@@ -21,9 +21,9 @@ function withBase(pathname) {
 
 app.use((req, res, next) => {
   res.locals.basePath = normalizedBasePath;
-  res.locals.assetVersion = '20260510-2';
+  res.locals.assetVersion = '20260510-3';
   res.locals.authUser = null;
-  res.setHeader('X-NewBharat-Build', '20260510-2');
+  res.setHeader('X-NewBharat-Build', '20260510-3');
 
   if (!normalizedBasePath) {
     return next();
@@ -1200,9 +1200,15 @@ function drawBankDetailsSection(doc, startY, selectedBank) {
   const rowHeight = 22;
   const qrImagePath = selectedBank.qrImage ? path.join(__dirname, 'public', selectedBank.qrImage) : '';
   const hasQrImage = Boolean(qrImagePath && fs.existsSync(qrImagePath));
-  const qrSize = 140;
-  const qrGap = 14;
+  const hasPaymentPanel = hasQrImage || Boolean(selectedBank.upiId);
+  const qrSize = 130;
+  const qrGap = 12;
   const upiTextHeight = selectedBank.upiId ? 16 : 0;
+  const paymentGap = hasPaymentPanel ? 15 : 0;
+  const paymentWidth = hasPaymentPanel ? 170 : 0;
+  const tableWidth = hasPaymentPanel ? width - paymentWidth - paymentGap : width;
+  const labelWidth = hasPaymentPanel ? 130 : 160;
+  const valueWidth = tableWidth - labelWidth;
   const rows = [
     ['Account Holder', selectedBank.holderName || '-'],
     ['Account Number', selectedBank.accountNumber || '-'],
@@ -1214,8 +1220,12 @@ function drawBankDetailsSection(doc, startY, selectedBank) {
     rows.push(['Branch', selectedBank.branch]);
   }
 
-  const qrSectionHeight = hasQrImage ? (qrGap + qrSize + (selectedBank.upiId ? qrGap + upiTextHeight : 0)) : (selectedBank.upiId ? qrGap + upiTextHeight : 0);
-  const estimatedHeight = titleHeight + (rows.length * rowHeight) + qrSectionHeight;
+  const tableHeight = rows.length * rowHeight;
+  const qrSectionHeight = hasPaymentPanel
+    ? ((hasQrImage ? qrSize : 0) + (selectedBank.upiId ? (hasQrImage ? qrGap : 0) + upiTextHeight : 0) + 24)
+    : 0;
+  const contentHeight = Math.max(tableHeight, qrSectionHeight);
+  const estimatedHeight = titleHeight + contentHeight;
   if (y + estimatedHeight > doc.page.height - doc.page.margins.bottom) {
     doc.addPage();
     y = doc.page.margins.top;
@@ -1231,40 +1241,46 @@ function drawBankDetailsSection(doc, startY, selectedBank) {
   });
   y += titleHeight;
 
+  const tableTop = y;
+  let rowY = tableTop;
+
   rows.forEach(([label, value]) => {
-    doc.rect(x, y, 160, rowHeight).stroke();
-    doc.rect(x + 160, y, width - 160, rowHeight).stroke();
-    doc.font('Helvetica-Bold').fontSize(10).text(label, x + 6, y + 6, { width: 148 });
-    doc.font('Helvetica').fontSize(10).text(value, x + 166, y + 6, { width: width - 172 });
-    y += rowHeight;
+    doc.rect(x, rowY, labelWidth, rowHeight).stroke();
+    doc.rect(x + labelWidth, rowY, valueWidth, rowHeight).stroke();
+    doc.font('Helvetica-Bold').fontSize(10).text(label, x + 6, rowY + 6, { width: labelWidth - 12 });
+    doc.font('Helvetica').fontSize(10).text(value, x + labelWidth + 6, rowY + 6, { width: valueWidth - 12 });
+    rowY += rowHeight;
   });
 
-  if (hasQrImage || selectedBank.upiId) {
-    y += qrGap;
-  }
+  if (hasPaymentPanel) {
+    const paymentX = x + tableWidth + paymentGap;
+    const paymentY = tableTop;
+    doc.rect(paymentX, paymentY, paymentWidth, contentHeight).stroke();
 
-  if (hasQrImage) {
-    const qrX = x + Math.round((width - qrSize) / 2);
-    doc.image(qrImagePath, qrX, y, {
-      fit: [qrSize, qrSize],
-      align: 'center',
-      valign: 'center'
-    });
-    y += qrSize;
-  }
+    let paymentContentY = paymentY + 12;
 
-  if (selectedBank.upiId) {
     if (hasQrImage) {
-      y += qrGap;
+      const qrX = paymentX + Math.round((paymentWidth - qrSize) / 2);
+      doc.image(qrImagePath, qrX, paymentContentY, {
+        fit: [qrSize, qrSize],
+        align: 'center',
+        valign: 'center'
+      });
+      paymentContentY += qrSize;
     }
-    doc.font('Helvetica-Bold').fontSize(10).text(`UPI ID : ${selectedBank.upiId}`, x, y, {
-      width,
-      align: 'center'
-    });
-    y += upiTextHeight;
+
+    if (selectedBank.upiId) {
+      if (hasQrImage) {
+        paymentContentY += qrGap;
+      }
+      doc.font('Helvetica-Bold').fontSize(10).text(`UPI ID : ${selectedBank.upiId}`, paymentX + 8, paymentContentY, {
+        width: paymentWidth - 16,
+        align: 'center'
+      });
+    }
   }
 
-  return y;
+  return tableTop + contentHeight;
 }
 
 function generatePdfKitBuffer({ quote, items, proposalItems, selectedBank, quoteId }) {
