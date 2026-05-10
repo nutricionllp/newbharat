@@ -21,9 +21,9 @@ function withBase(pathname) {
 
 app.use((req, res, next) => {
   res.locals.basePath = normalizedBasePath;
-  res.locals.assetVersion = '20260426-1';
+  res.locals.assetVersion = '20260510-1';
   res.locals.authUser = null;
-  res.setHeader('X-NewBharat-Build', '20260426-1');
+  res.setHeader('X-NewBharat-Build', '20260510-1');
 
   if (!normalizedBasePath) {
     return next();
@@ -274,6 +274,7 @@ function getSafeNextPath(nextValue) {
 function normalizeBankAccount(bank, index) {
   return {
     key: text(bank.key || `bank-${index + 1}`).trim(),
+    isDefault: Boolean(bank.isDefault),
     label: text(bank.label || bank.bankName || `Bank ${index + 1}`).trim(),
     holderName: text(bank.holderName || bank.accountName).trim(),
     accountNumber: text(bank.accountNumber || bank.accountNo).trim(),
@@ -289,6 +290,14 @@ function getConfiguredBankAccounts() {
     .filter((bank) => bank.key);
 }
 
+function getDefaultBank(configuredBanks = getConfiguredBankAccounts()) {
+  if (!configuredBanks.length) {
+    return null;
+  }
+
+  return configuredBanks.find((bank) => bank.isDefault) || configuredBanks[0];
+}
+
 function getSelectedBank(bankKey) {
   const configuredBanks = getConfiguredBankAccounts();
   if (!configuredBanks.length) {
@@ -296,7 +305,7 @@ function getSelectedBank(bankKey) {
   }
 
   const requestedKey = text(bankKey).trim();
-  return configuredBanks.find((bank) => bank.key === requestedKey) || configuredBanks[0];
+  return configuredBanks.find((bank) => bank.key === requestedKey) || getDefaultBank(configuredBanks);
 }
 
 function round2(value) {

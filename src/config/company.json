@@ -23,6 +23,7 @@
     },
     {
       "key": "pnb",
+      "isDefault": true,
       "label": "Punjab National Bank",
       "holderName": "New Bharat Enterprise",
       "accountNumber": "027600 2100 118 659",

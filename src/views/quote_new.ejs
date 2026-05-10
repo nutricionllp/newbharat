@@ -32,7 +32,8 @@
         Bank Account Details
         <select name="selected_bank_key" required>
           <% const availableBanks = (company && Array.isArray(company.bankAccounts)) ? company.bankAccounts : []; %>
-          <% const selectedBankKey = quote?.selected_bank_key || (availableBanks[0] && availableBanks[0].key) || ''; %>
+          <% const defaultBank = availableBanks.find((bank) => bank.isDefault) || availableBanks[0]; %>
+          <% const selectedBankKey = quote?.selected_bank_key || (defaultBank && defaultBank.key) || ''; %>
           <% availableBanks.forEach((bank) => { %>
             <option value="<%= bank.key %>" <%= selectedBankKey === bank.key ? 'selected' : '' %>><%= bank.label %></option>
           <% }) %>
