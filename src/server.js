@@ -21,9 +21,9 @@ function withBase(pathname) {
 
 app.use((req, res, next) => {
   res.locals.basePath = normalizedBasePath;
-  res.locals.assetVersion = '20260510-1';
+  res.locals.assetVersion = '20260510-2';
   res.locals.authUser = null;
-  res.setHeader('X-NewBharat-Build', '20260510-1');
+  res.setHeader('X-NewBharat-Build', '20260510-2');
 
   if (!normalizedBasePath) {
     return next();
@@ -280,7 +280,9 @@ function normalizeBankAccount(bank, index) {
     accountNumber: text(bank.accountNumber || bank.accountNo).trim(),
     bankName: text(bank.bankName || bank.label).trim(),
     ifsc: text(bank.ifsc).trim(),
-    branch: text(bank.branch).trim()
+    branch: text(bank.branch).trim(),
+    upiId: text(bank.upiId).trim(),
+    qrImage: text(bank.qrImage).trim()
   };
 }
 
@@ -1023,6 +1025,9 @@ function buildFallbackPdfLines({ quote, items, proposalItems, selectedBank }) {
     if (selectedBank.branch) {
       lines.push(`Branch: ${selectedBank.branch}`);
     }
+    if (selectedBank.upiId) {
+      lines.push(`UPI ID: ${selectedBank.upiId}`);
+    }
   }
 
   if (quote.notes) {
@@ -1193,6 +1198,11 @@ function drawBankDetailsSection(doc, startY, selectedBank) {
   const width = 515;
   const titleHeight = 24;
   const rowHeight = 22;
+  const qrImagePath = selectedBank.qrImage ? path.join(__dirname, 'public', selectedBank.qrImage) : '';
+  const hasQrImage = Boolean(qrImagePath && fs.existsSync(qrImagePath));
+  const qrSize = 140;
+  const qrGap = 14;
+  const upiTextHeight = selectedBank.upiId ? 16 : 0;
   const rows = [
     ['Account Holder', selectedBank.holderName || '-'],
     ['Account Number', selectedBank.accountNumber || '-'],
@@ -1204,7 +1214,8 @@ function drawBankDetailsSection(doc, startY, selectedBank) {
     rows.push(['Branch', selectedBank.branch]);
   }
 
-  const estimatedHeight = titleHeight + (rows.length * rowHeight);
+  const qrSectionHeight = hasQrImage ? (qrGap + qrSize + (selectedBank.upiId ? qrGap + upiTextHeight : 0)) : (selectedBank.upiId ? qrGap + upiTextHeight : 0);
+  const estimatedHeight = titleHeight + (rows.length * rowHeight) + qrSectionHeight;
   if (y + estimatedHeight > doc.page.height - doc.page.margins.bottom) {
     doc.addPage();
     y = doc.page.margins.top;
@@ -1227,6 +1238,31 @@ function drawBankDetailsSection(doc, startY, selectedBank) {
     doc.font('Helvetica').fontSize(10).text(value, x + 166, y + 6, { width: width - 172 });
     y += rowHeight;
   });
+
+  if (hasQrImage || selectedBank.upiId) {
+    y += qrGap;
+  }
+
+  if (hasQrImage) {
+    const qrX = x + Math.round((width - qrSize) / 2);
+    doc.image(qrImagePath, qrX, y, {
+      fit: [qrSize, qrSize],
+      align: 'center',
+      valign: 'center'
+    });
+    y += qrSize;
+  }
+
+  if (selectedBank.upiId) {
+    if (hasQrImage) {
+      y += qrGap;
+    }
+    doc.font('Helvetica-Bold').fontSize(10).text(`UPI ID : ${selectedBank.upiId}`, x, y, {
+      width,
+      align: 'center'
+    });
+    y += upiTextHeight;
+  }
 
   return y;
 }

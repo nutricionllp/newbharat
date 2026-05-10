@@ -19,7 +19,9 @@
       "accountNumber": "5020 0116 9528 97",
       "bankName": "HDFC Bank",
       "ifsc": "HDFC0007621",
-      "branch": "TOWN HALL ROAD KADI"
+      "branch": "TOWN HALL ROAD KADI",
+      "upiId": "",
+      "qrImage": ""
     },
     {
       "key": "pnb",
@@ -29,7 +31,9 @@
       "accountNumber": "027600 2100 118 659",
       "bankName": "Punjab National Bank",
       "ifsc": "PUNB0027600",
-      "branch": ""
+      "branch": "",
+      "upiId": "7861004399m@pnb",
+      "qrImage": "pnb-upi-qr.png"
     }
   ],
   "proposalTemplate": [
